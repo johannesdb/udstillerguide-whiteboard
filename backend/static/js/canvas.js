@@ -49,96 +49,107 @@ export class Camera {
     }
 }
 
-// === Element Types ===
+// === Element Factory Functions ===
+
 export function createStickyNote(x, y, color = '#FFF176') {
     return {
-        id: generateId(),
-        type: 'sticky',
-        x, y,
-        width: 200,
-        height: 200,
-        color,
-        content: '',
-        fontSize: 14,
-        rotation: 0,
+        id: generateId(), type: 'sticky',
+        x, y, width: 200, height: 200,
+        color, content: '', fontSize: 14, rotation: 0,
     };
 }
 
 export function createRect(x, y, w, h, color = '#333333', fill = 'transparent') {
     return {
-        id: generateId(),
-        type: 'rect',
-        x, y,
-        width: w,
-        height: h,
-        color,
-        fill,
-        strokeWidth: 2,
-        rotation: 0,
+        id: generateId(), type: 'rect',
+        x, y, width: w, height: h,
+        color, fill, strokeWidth: 2, rotation: 0,
     };
 }
 
 export function createCircle(x, y, rx, ry, color = '#333333', fill = 'transparent') {
     return {
-        id: generateId(),
-        type: 'circle',
-        x, y,
-        width: rx * 2,
-        height: ry * 2,
-        color,
-        fill,
-        strokeWidth: 2,
-        rotation: 0,
+        id: generateId(), type: 'circle',
+        x, y, width: rx * 2, height: ry * 2,
+        color, fill, strokeWidth: 2, rotation: 0,
+    };
+}
+
+export function createTriangle(x, y, w, h, color = '#333333', fill = 'transparent') {
+    return {
+        id: generateId(), type: 'triangle',
+        x, y, width: w, height: h,
+        color, fill, strokeWidth: 2, rotation: 0,
+    };
+}
+
+export function createDiamond(x, y, w, h, color = '#333333', fill = 'transparent') {
+    return {
+        id: generateId(), type: 'diamond',
+        x, y, width: w, height: h,
+        color, fill, strokeWidth: 2, rotation: 0,
+    };
+}
+
+export function createStar(x, y, w, h, color = '#333333', fill = 'transparent') {
+    return {
+        id: generateId(), type: 'star',
+        x, y, width: w, height: h,
+        color, fill, strokeWidth: 2, rotation: 0, points: 5,
+    };
+}
+
+export function createHexagon(x, y, w, h, color = '#333333', fill = 'transparent') {
+    return {
+        id: generateId(), type: 'hexagon',
+        x, y, width: w, height: h,
+        color, fill, strokeWidth: 2, rotation: 0,
     };
 }
 
 export function createLine(x1, y1, x2, y2, color = '#333333', strokeWidth = 2) {
     return {
-        id: generateId(),
-        type: 'line',
-        x: x1, y: y1,
-        x2, y2,
-        color,
-        strokeWidth,
+        id: generateId(), type: 'line',
+        x: x1, y: y1, x2, y2,
+        color, strokeWidth,
     };
 }
 
 export function createArrow(x1, y1, x2, y2, color = '#333333', strokeWidth = 2) {
     return {
-        id: generateId(),
-        type: 'arrow',
-        x: x1, y: y1,
-        x2, y2,
-        color,
-        strokeWidth,
+        id: generateId(), type: 'arrow',
+        x: x1, y: y1, x2, y2,
+        color, strokeWidth,
     };
 }
 
 export function createDrawing(points, color = '#333333', strokeWidth = 2) {
     return {
-        id: generateId(),
-        type: 'drawing',
-        points, // [{x, y}, ...]
-        color,
-        strokeWidth,
-        x: 0, y: 0,
+        id: generateId(), type: 'drawing',
+        points, color, strokeWidth, x: 0, y: 0,
     };
 }
 
 export function createText(x, y, content, color = '#333333', fontSize = 16) {
     return {
-        id: generateId(),
-        type: 'text',
-        x, y,
-        content,
-        color,
-        fontSize,
-        width: 0,
-        height: 0,
+        id: generateId(), type: 'text',
+        x, y, content, color, fontSize,
+        width: 0, height: 0,
+    };
+}
+
+export function createTextBox(x, y, w, h, color = '#333333', fill = '#FFFFFF') {
+    return {
+        id: generateId(), type: 'textbox',
+        x, y, width: w, height: h,
+        color, fill, content: '',
+        fontSize: 14, strokeWidth: 1, rotation: 0,
+        borderColor: '#cccccc',
     };
 }
 
 // === Hit Testing ===
+
 function pointInRect(px, py, el) {
     return px >= el.x && px <= el.x + el.width &&
            py >= el.y && py <= el.y + el.height;
@@ -149,6 +160,7 @@ function pointInCircle(px, py, el) {
     const cy = el.y + el.height / 2;
     const rx = el.width / 2;
     const ry = el.height / 2;
+    if (rx === 0 || ry === 0) return false;
     const dx = (px - cx) / rx;
     const dy = (py - cy) / ry;
     return dx * dx + dy * dy <= 1;
@@ -159,7 +171,6 @@ function pointNearLine(px, py, x1, y1, x2, y2, threshold = 8) {
     const dy = y2 - y1;
     const lenSq = dx * dx + dy * dy;
     if (lenSq === 0) return Math.hypot(px - x1, py - y1) <= threshold;
-
     let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
     t = Math.max(0, Math.min(1, t));
     const nearX = x1 + t * dx;
@@ -171,11 +182,72 @@ function pointNearDrawing(px, py, el, threshold = 8) {
     for (let i = 1; i < el.points.length; i++) {
         const p0 = el.points[i - 1];
         const p1 = el.points[i];
-        if (pointNearLine(px, py, p0.x, p0.y, p1.x, p1.y, threshold)) {
-            return true;
-        }
+        if (pointNearLine(px, py, p0.x, p0.y, p1.x, p1.y, threshold)) return true;
     }
     return false;
+}
+
+function pointInPolygon(px, py, vertices) {
+    let inside = false;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+        const xi = vertices[i][0], yi = vertices[i][1];
+        const xj = vertices[j][0], yj = vertices[j][1];
+        if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+function getTriangleVertices(el) {
+    return [
+        [el.x + el.width / 2, el.y],
+        [el.x + el.width, el.y + el.height],
+        [el.x, el.y + el.height],
+    ];
+}
+
+function getDiamondVertices(el) {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    return [
+        [cx, el.y],
+        [el.x + el.width, cy],
+        [cx, el.y + el.height],
+        [el.x, cy],
+    ];
+}
+
+function getHexagonVertices(el) {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const rx = el.width / 2;
+    const ry = el.height / 2;
+    const verts = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 2;
+        verts.push([cx + rx * Math.cos(angle), cy + ry * Math.sin(angle)]);
+    }
+    return verts;
+}
+
+function getStarVertices(el) {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const outerRx = el.width / 2;
+    const outerRy = el.height / 2;
+    const innerRx = outerRx * 0.4;
+    const innerRy = outerRy * 0.4;
+    const numPoints = el.points || 5;
+    const verts = [];
+    for (let i = 0; i < numPoints * 2; i++) {
+        const angle = (Math.PI / numPoints) * i - Math.PI / 2;
+        const isOuter = i % 2 === 0;
+        const rx = isOuter ? outerRx : innerRx;
+        const ry = isOuter ? outerRy : innerRy;
+        verts.push([cx + rx * Math.cos(angle), cy + ry * Math.sin(angle)]);
+    }
+    return verts;
 }
 
 export function hitTest(px, py, el, zoom = 1) {
@@ -183,9 +255,18 @@ export function hitTest(px, py, el, zoom = 1) {
     switch (el.type) {
         case 'sticky':
         case 'rect':
+        case 'textbox':
             return pointInRect(px, py, el);
         case 'circle':
             return pointInCircle(px, py, el);
+        case 'triangle':
+            return pointInPolygon(px, py, getTriangleVertices(el));
+        case 'diamond':
+            return pointInPolygon(px, py, getDiamondVertices(el));
+        case 'hexagon':
+            return pointInPolygon(px, py, getHexagonVertices(el));
+        case 'star':
+            return pointInPolygon(px, py, getStarVertices(el));
         case 'line':
         case 'arrow':
             return pointNearLine(px, py, el.x, el.y, el.x2, el.y2, threshold);
@@ -193,8 +274,7 @@ export function hitTest(px, py, el, zoom = 1) {
             return pointNearDrawing(px, py, el, threshold);
         case 'text':
             return pointInRect(px, py, {
-                x: el.x,
-                y: el.y - el.fontSize,
+                x: el.x, y: el.y,
                 width: el.width || el.content.length * el.fontSize * 0.6,
                 height: el.height || el.fontSize * 1.4,
             });
@@ -204,16 +284,13 @@ export function hitTest(px, py, el, zoom = 1) {
 }
 
 // === Resize Handle Hit Test ===
+
 export function hitTestResizeHandle(px, py, el, zoom = 1) {
     if (el.type === 'line' || el.type === 'arrow' || el.type === 'drawing') return null;
-
     const handleSize = 8 / zoom;
     const handles = getResizeHandles(el);
-
     for (const [name, hx, hy] of handles) {
-        if (Math.abs(px - hx) <= handleSize && Math.abs(py - hy) <= handleSize) {
-            return name;
-        }
+        if (Math.abs(px - hx) <= handleSize && Math.abs(py - hy) <= handleSize) return name;
     }
     return null;
 }
@@ -229,6 +306,7 @@ function getResizeHandles(el) {
 }
 
 // === Main Whiteboard App ===
+
 export class WhiteboardApp {
     constructor(canvasId, options = {}) {
         this.canvas = document.getElementById(canvasId);
@@ -253,6 +331,10 @@ export class WhiteboardApp {
         // Remote cursors
         this.remoteCursors = new Map();
 
+        // Auto-save timer (30 seconds)
+        this.autoSaveInterval = null;
+        this.lastSavedState = null;
+
         // Setup
         this.resize();
         this.setupEventListeners();
@@ -273,8 +355,17 @@ export class WhiteboardApp {
         // Save initial state
         this.saveHistory();
 
+        // Start auto-save timer
+        this.startAutoSave();
+
         // Start render loop
         this.render();
+    }
+
+    startAutoSave() {
+        this.autoSaveInterval = setInterval(() => {
+            this.syncManager.requestSave();
+        }, 30000);
     }
 
     resize() {
@@ -289,9 +380,7 @@ export class WhiteboardApp {
     setupEventListeners() {
         window.addEventListener('resize', () => this.resize());
 
-        // Keyboard shortcuts
         window.addEventListener('keydown', (e) => {
-            // Ignore if typing in input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
             if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -362,12 +451,9 @@ export class WhiteboardApp {
         this.selectedIds = new Set(this.elements.map(e => e.id));
     }
 
-    // === Hit Test All Elements (top to bottom) ===
     hitTestElements(wx, wy) {
         for (let i = this.elements.length - 1; i >= 0; i--) {
-            if (hitTest(wx, wy, this.elements[i], this.camera.zoom)) {
-                return this.elements[i];
-            }
+            if (hitTest(wx, wy, this.elements[i], this.camera.zoom)) return this.elements[i];
         }
         return null;
     }
@@ -375,12 +461,9 @@ export class WhiteboardApp {
     // === History (Undo/Redo) ===
     saveHistory() {
         const state = JSON.parse(JSON.stringify(this.elements));
-        // Truncate future history if we undid some actions
         this.history = this.history.slice(0, this.historyIndex + 1);
         this.history.push(state);
-        if (this.history.length > this.maxHistory) {
-            this.history.shift();
-        }
+        if (this.history.length > this.maxHistory) this.history.shift();
         this.historyIndex = this.history.length - 1;
     }
 
@@ -403,38 +486,27 @@ export class WhiteboardApp {
     // === Render ===
     render() {
         const ctx = this.ctx;
-        const cam = this.camera;
         const w = this.canvas.width / (window.devicePixelRatio || 1);
         const h = this.canvas.height / (window.devicePixelRatio || 1);
 
-        // Clear
         ctx.clearRect(0, 0, w, h);
-
-        // Background
         ctx.fillStyle = '#f5f5f5';
         ctx.fillRect(0, 0, w, h);
 
-        // Draw grid dots
         this.drawGrid(ctx, w, h);
 
-        // Draw elements (with frustum culling)
         for (const el of this.elements) {
             if (!this.isVisible(el, w, h)) continue;
             this.drawElement(ctx, el);
         }
 
-        // Draw selection indicators
         for (const id of this.selectedIds) {
             const el = this.getElementById(id);
             if (el) this.drawSelection(ctx, el);
         }
 
-        // Draw tool preview (e.g., shape being drawn)
-        if (this.toolManager) {
-            this.toolManager.drawPreview(ctx);
-        }
+        if (this.toolManager) this.toolManager.drawPreview(ctx);
 
-        // Draw remote cursors
         this.drawRemoteCursors(ctx);
 
         requestAnimationFrame(() => this.render());
@@ -443,25 +515,19 @@ export class WhiteboardApp {
     drawGrid(ctx, w, h) {
         const cam = this.camera;
         const gridSize = 30;
-        const dotSize = 1;
+        if (cam.zoom < 0.3) return;
 
-        // Calculate visible world bounds
         const topLeft = cam.screenToWorld(0, 0);
         const bottomRight = cam.screenToWorld(w, h);
-
         const startX = Math.floor(topLeft.x / gridSize) * gridSize;
         const startY = Math.floor(topLeft.y / gridSize) * gridSize;
 
         ctx.fillStyle = '#ddd';
-
-        // Skip grid if too zoomed out
-        if (cam.zoom < 0.3) return;
-
         for (let wx = startX; wx <= bottomRight.x; wx += gridSize) {
             for (let wy = startY; wy <= bottomRight.y; wy += gridSize) {
                 const s = cam.worldToScreen(wx, wy);
                 ctx.beginPath();
-                ctx.arc(s.x, s.y, dotSize, 0, Math.PI * 2);
+                ctx.arc(s.x, s.y, 1, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -473,13 +539,10 @@ export class WhiteboardApp {
 
         if (el.type === 'drawing') {
             if (!el.points || el.points.length === 0) return false;
-            // Check bounding box of drawing
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             for (const p of el.points) {
-                minX = Math.min(minX, p.x);
-                minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x);
-                maxY = Math.max(maxY, p.y);
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
             }
             const s1 = cam.worldToScreen(minX, minY);
             const s2 = cam.worldToScreen(maxX, maxY);
@@ -490,12 +553,8 @@ export class WhiteboardApp {
         if (el.type === 'line' || el.type === 'arrow') {
             const s1 = cam.worldToScreen(el.x, el.y);
             const s2 = cam.worldToScreen(el.x2, el.y2);
-            const minSx = Math.min(s1.x, s2.x);
-            const maxSx = Math.max(s1.x, s2.x);
-            const minSy = Math.min(s1.y, s2.y);
-            const maxSy = Math.max(s1.y, s2.y);
-            return maxSx >= -margin && minSx <= screenW + margin &&
-                   maxSy >= -margin && minSy <= screenH + margin;
+            return Math.max(s1.x, s2.x) >= -margin && Math.min(s1.x, s2.x) <= screenW + margin &&
+                   Math.max(s1.y, s2.y) >= -margin && Math.min(s1.y, s2.y) <= screenH + margin;
         }
 
         const s = cam.worldToScreen(el.x, el.y);
@@ -506,69 +565,65 @@ export class WhiteboardApp {
     }
 
     drawElement(ctx, el) {
-        const cam = this.camera;
-
         switch (el.type) {
-            case 'sticky':
-                this.drawSticky(ctx, el);
-                break;
-            case 'rect':
-                this.drawRect(ctx, el);
-                break;
-            case 'circle':
-                this.drawCircleEl(ctx, el);
-                break;
-            case 'line':
-                this.drawLine(ctx, el);
-                break;
-            case 'arrow':
-                this.drawArrow(ctx, el);
-                break;
-            case 'drawing':
-                this.drawDrawing(ctx, el);
-                break;
-            case 'text':
-                this.drawText(ctx, el);
-                break;
+            case 'sticky': this.drawSticky(ctx, el); break;
+            case 'rect': this.drawRect(ctx, el); break;
+            case 'circle': this.drawCircleEl(ctx, el); break;
+            case 'triangle': this.drawTriangle(ctx, el); break;
+            case 'diamond': this.drawDiamond(ctx, el); break;
+            case 'star': this.drawStar(ctx, el); break;
+            case 'hexagon': this.drawHexagon(ctx, el); break;
+            case 'line': this.drawLine(ctx, el); break;
+            case 'arrow': this.drawArrow(ctx, el); break;
+            case 'drawing': this.drawDrawing(ctx, el); break;
+            case 'text': this.drawText(ctx, el); break;
+            case 'textbox': this.drawTextBox(ctx, el); break;
         }
     }
 
+    // --- Sticky Note ---
     drawSticky(ctx, el) {
         const cam = this.camera;
         const s = cam.worldToScreen(el.x, el.y);
         const sw = el.width * cam.zoom;
         const sh = el.height * cam.zoom;
 
-        // Shadow
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.15)';
         ctx.shadowBlur = 8 * cam.zoom;
         ctx.shadowOffsetY = 2 * cam.zoom;
 
-        // Background
         ctx.fillStyle = el.color || '#FFF176';
         ctx.beginPath();
         ctx.roundRect(s.x, s.y, sw, sh, 4 * cam.zoom);
         ctx.fill();
         ctx.restore();
 
-        // Text content
+        // Fold corner
+        const foldSize = 20 * cam.zoom;
+        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+        ctx.beginPath();
+        ctx.moveTo(s.x + sw - foldSize, s.y);
+        ctx.lineTo(s.x + sw, s.y);
+        ctx.lineTo(s.x + sw, s.y + foldSize);
+        ctx.closePath();
+        ctx.fill();
+
         if (el.content) {
             ctx.fillStyle = '#333';
             ctx.font = `${(el.fontSize || 14) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.textBaseline = 'top';
-
             const padding = 12 * cam.zoom;
             const maxWidth = sw - padding * 2;
             const lines = this.wrapText(ctx, el.content, maxWidth);
             const lineHeight = (el.fontSize || 14) * 1.3 * cam.zoom;
-
             for (let i = 0; i < lines.length; i++) {
                 ctx.fillText(lines[i], s.x + padding, s.y + padding + i * lineHeight, maxWidth);
             }
         }
     }
 
+    // --- Rectangle ---
     drawRect(ctx, el) {
         const cam = this.camera;
         const s = cam.worldToScreen(el.x, el.y);
@@ -577,14 +632,18 @@ export class WhiteboardApp {
 
         if (el.fill && el.fill !== 'transparent') {
             ctx.fillStyle = el.fill;
-            ctx.fillRect(s.x, s.y, sw, sh);
+            ctx.beginPath();
+            ctx.roundRect(s.x, s.y, sw, sh, 2 * cam.zoom);
+            ctx.fill();
         }
-
         ctx.strokeStyle = el.color || '#333';
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
-        ctx.strokeRect(s.x, s.y, sw, sh);
+        ctx.beginPath();
+        ctx.roundRect(s.x, s.y, sw, sh, 2 * cam.zoom);
+        ctx.stroke();
     }
 
+    // --- Circle/Ellipse ---
     drawCircleEl(ctx, el) {
         const cam = this.camera;
         const cx = el.x + el.width / 2;
@@ -595,32 +654,78 @@ export class WhiteboardApp {
 
         ctx.beginPath();
         ctx.ellipse(s.x, s.y, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI * 2);
-
         if (el.fill && el.fill !== 'transparent') {
             ctx.fillStyle = el.fill;
             ctx.fill();
         }
-
         ctx.strokeStyle = el.color || '#333';
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.stroke();
     }
 
+    // --- Triangle ---
+    drawTriangle(ctx, el) {
+        const cam = this.camera;
+        const verts = getTriangleVertices(el);
+        this._drawPolygon(ctx, cam, verts, el);
+    }
+
+    // --- Diamond ---
+    drawDiamond(ctx, el) {
+        const cam = this.camera;
+        const verts = getDiamondVertices(el);
+        this._drawPolygon(ctx, cam, verts, el);
+    }
+
+    // --- Star ---
+    drawStar(ctx, el) {
+        const cam = this.camera;
+        const verts = getStarVertices(el);
+        this._drawPolygon(ctx, cam, verts, el);
+    }
+
+    // --- Hexagon ---
+    drawHexagon(ctx, el) {
+        const cam = this.camera;
+        const verts = getHexagonVertices(el);
+        this._drawPolygon(ctx, cam, verts, el);
+    }
+
+    // Helper to draw any polygon
+    _drawPolygon(ctx, cam, worldVerts, el) {
+        const screenVerts = worldVerts.map(([wx, wy]) => cam.worldToScreen(wx, wy));
+
+        ctx.beginPath();
+        ctx.moveTo(screenVerts[0].x, screenVerts[0].y);
+        for (let i = 1; i < screenVerts.length; i++) {
+            ctx.lineTo(screenVerts[i].x, screenVerts[i].y);
+        }
+        ctx.closePath();
+
+        if (el.fill && el.fill !== 'transparent') {
+            ctx.fillStyle = el.fill;
+            ctx.fill();
+        }
+        ctx.strokeStyle = el.color || '#333';
+        ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
+        ctx.stroke();
+    }
+
+    // --- Line ---
     drawLine(ctx, el) {
         const cam = this.camera;
         const s1 = cam.worldToScreen(el.x, el.y);
         const s2 = cam.worldToScreen(el.x2, el.y2);
-
         ctx.strokeStyle = el.color || '#333';
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
-
         ctx.beginPath();
         ctx.moveTo(s1.x, s1.y);
         ctx.lineTo(s2.x, s2.y);
         ctx.stroke();
     }
 
+    // --- Arrow ---
     drawArrow(ctx, el) {
         const cam = this.camera;
         const s1 = cam.worldToScreen(el.x, el.y);
@@ -631,13 +736,11 @@ export class WhiteboardApp {
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
 
-        // Line
         ctx.beginPath();
         ctx.moveTo(s1.x, s1.y);
         ctx.lineTo(s2.x, s2.y);
         ctx.stroke();
 
-        // Arrowhead
         const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
         const headLen = 12 * cam.zoom;
         ctx.beginPath();
@@ -648,10 +751,10 @@ export class WhiteboardApp {
         ctx.fill();
     }
 
+    // --- Freehand Drawing ---
     drawDrawing(ctx, el) {
         if (!el.points || el.points.length < 2) return;
         const cam = this.camera;
-
         ctx.strokeStyle = el.color || '#333';
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
@@ -660,7 +763,6 @@ export class WhiteboardApp {
         ctx.beginPath();
         const s0 = cam.worldToScreen(el.points[0].x, el.points[0].y);
         ctx.moveTo(s0.x, s0.y);
-
         for (let i = 1; i < el.points.length; i++) {
             const s = cam.worldToScreen(el.points[i].x, el.points[i].y);
             ctx.lineTo(s.x, s.y);
@@ -668,22 +770,18 @@ export class WhiteboardApp {
         ctx.stroke();
     }
 
+    // --- Text ---
     drawText(ctx, el) {
         const cam = this.camera;
         const s = cam.worldToScreen(el.x, el.y);
-
         ctx.fillStyle = el.color || '#333';
         ctx.font = `${(el.fontSize || 16) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
         ctx.textBaseline = 'top';
 
         const lines = (el.content || '').split('\n');
         const lineHeight = (el.fontSize || 16) * 1.3 * cam.zoom;
-
         let maxW = 0;
-        for (const line of lines) {
-            maxW = Math.max(maxW, ctx.measureText(line).width);
-        }
-        // Update element dimensions for hit testing
+        for (const line of lines) maxW = Math.max(maxW, ctx.measureText(line).width);
         el.width = maxW / cam.zoom;
         el.height = (lines.length * lineHeight) / cam.zoom;
 
@@ -692,6 +790,42 @@ export class WhiteboardApp {
         }
     }
 
+    // --- Text Box (bordered text area) ---
+    drawTextBox(ctx, el) {
+        const cam = this.camera;
+        const s = cam.worldToScreen(el.x, el.y);
+        const sw = el.width * cam.zoom;
+        const sh = el.height * cam.zoom;
+
+        // Background
+        ctx.fillStyle = el.fill || '#FFFFFF';
+        ctx.beginPath();
+        ctx.roundRect(s.x, s.y, sw, sh, 4 * cam.zoom);
+        ctx.fill();
+
+        // Border
+        ctx.strokeStyle = el.borderColor || '#cccccc';
+        ctx.lineWidth = (el.strokeWidth || 1) * cam.zoom;
+        ctx.beginPath();
+        ctx.roundRect(s.x, s.y, sw, sh, 4 * cam.zoom);
+        ctx.stroke();
+
+        // Text content
+        if (el.content) {
+            ctx.fillStyle = el.color || '#333';
+            ctx.font = `${(el.fontSize || 14) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.textBaseline = 'top';
+            const padding = 10 * cam.zoom;
+            const maxWidth = sw - padding * 2;
+            const lines = this.wrapText(ctx, el.content, maxWidth);
+            const lineHeight = (el.fontSize || 14) * 1.3 * cam.zoom;
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], s.x + padding, s.y + padding + i * lineHeight, maxWidth);
+            }
+        }
+    }
+
+    // --- Selection ---
     drawSelection(ctx, el) {
         const cam = this.camera;
         const pad = 4;
@@ -700,10 +834,8 @@ export class WhiteboardApp {
             if (!el.points || el.points.length === 0) return;
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             for (const p of el.points) {
-                minX = Math.min(minX, p.x);
-                minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x);
-                maxY = Math.max(maxY, p.y);
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
             }
             const s1 = cam.worldToScreen(minX - pad, minY - pad);
             const s2 = cam.worldToScreen(maxX + pad, maxY + pad);
@@ -718,7 +850,6 @@ export class WhiteboardApp {
         if (el.type === 'line' || el.type === 'arrow') {
             const s1 = cam.worldToScreen(el.x, el.y);
             const s2 = cam.worldToScreen(el.x2, el.y2);
-            // Draw handles at endpoints
             ctx.fillStyle = '#2196F3';
             for (const s of [s1, s2]) {
                 ctx.beginPath();
@@ -738,7 +869,6 @@ export class WhiteboardApp {
         ctx.strokeRect(s.x, s.y, sw, sh);
         ctx.setLineDash([]);
 
-        // Resize handles
         const handles = getResizeHandles(el);
         ctx.fillStyle = 'white';
         ctx.strokeStyle = '#2196F3';
@@ -751,12 +881,12 @@ export class WhiteboardApp {
         }
     }
 
+    // --- Remote Cursors ---
     drawRemoteCursors(ctx) {
-        for (const [userId, cursor] of this.remoteCursors) {
+        for (const [, cursor] of this.remoteCursors) {
             const s = this.camera.worldToScreen(cursor.x, cursor.y);
             ctx.fillStyle = cursor.color || '#F44336';
 
-            // Cursor arrow
             ctx.beginPath();
             ctx.moveTo(s.x, s.y);
             ctx.lineTo(s.x + 3, s.y + 14);
@@ -764,19 +894,16 @@ export class WhiteboardApp {
             ctx.closePath();
             ctx.fill();
 
-            // Name label
             if (cursor.username) {
                 const fontSize = 11;
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 const textW = ctx.measureText(cursor.username).width;
                 const labelX = s.x + 12;
                 const labelY = s.y + 14;
-
                 ctx.fillStyle = cursor.color || '#F44336';
                 ctx.beginPath();
                 ctx.roundRect(labelX - 2, labelY - 2, textW + 8, fontSize + 6, 3);
                 ctx.fill();
-
                 ctx.fillStyle = 'white';
                 ctx.fillText(cursor.username, labelX + 2, labelY + fontSize - 1);
             }
@@ -785,9 +912,7 @@ export class WhiteboardApp {
 
     wrapText(ctx, text, maxWidth) {
         const lines = [];
-        const paragraphs = text.split('\n');
-
-        for (const para of paragraphs) {
+        for (const para of text.split('\n')) {
             const words = para.split(' ');
             let line = '';
             for (const word of words) {
@@ -804,12 +929,9 @@ export class WhiteboardApp {
         return lines;
     }
 
-    // === Elements in rectangle (for multi-select) ===
     elementsInRect(x1, y1, x2, y2) {
-        const minX = Math.min(x1, x2);
-        const maxX = Math.max(x1, x2);
-        const minY = Math.min(y1, y2);
-        const maxY = Math.max(y1, y2);
+        const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
 
         return this.elements.filter(el => {
             if (el.type === 'line' || el.type === 'arrow') {
@@ -821,11 +943,8 @@ export class WhiteboardApp {
                     p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
                 );
             }
-            // Bounding box overlap
-            const ex = el.x;
-            const ey = el.y;
-            const ew = el.width || 100;
-            const eh = el.height || 30;
+            const ex = el.x, ey = el.y;
+            const ew = el.width || 100, eh = el.height || 30;
             return ex < maxX && ex + ew > minX && ey < maxY && ey + eh > minY;
         });
     }

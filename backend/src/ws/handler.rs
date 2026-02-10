@@ -173,6 +173,20 @@ async fn handle_socket(
                     }
                 }
                 Message::Text(text) => {
+                    // Check for save_request from auto-save timer
+                    if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if msg.get("type").and_then(|t| t.as_str()) == Some("save_request") {
+                            let doc = room_doc.read().await;
+                            let state_bytes = sync::encode_doc_state(&doc);
+                            drop(doc);
+                            if let Err(e) = db::boards::save_yrs_state(&pool, board_id_clone, &state_bytes).await {
+                                tracing::error!("Auto-save failed: {}", e);
+                            } else {
+                                tracing::debug!("Auto-save completed for board {}", board_id_clone);
+                            }
+                            continue;
+                        }
+                    }
                     // Forward text messages (JSON custom messages)
                     let _ = room_tx.send(text.into_bytes());
                 }

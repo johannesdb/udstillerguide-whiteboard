@@ -258,6 +258,13 @@ export class SyncManager {
         }
     }
 
+    // Request server to persist board state now (called by auto-save timer)
+    requestSave() {
+        this.send(JSON.stringify({
+            type: 'save_request',
+        }));
+    }
+
     disconnect() {
         if (this.ws) {
             this.ws.close();

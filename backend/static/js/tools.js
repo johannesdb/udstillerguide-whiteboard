@@ -1,9 +1,14 @@
 // Tool Manager - handles all whiteboard tools and their interactions
 import {
-    createStickyNote, createRect, createCircle,
-    createLine, createArrow, createDrawing, createText,
+    createStickyNote, createRect, createCircle, createTriangle,
+    createDiamond, createStar, createHexagon,
+    createLine, createArrow, createDrawing, createText, createTextBox,
     hitTest, hitTestResizeHandle,
 } from '/js/canvas.js';
+
+// All shape-type tools that use drag-to-create
+const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
+const LINE_TOOLS = new Set(['line', 'arrow']);
 
 export class ToolManager {
     constructor(app) {
@@ -27,68 +32,65 @@ export class ToolManager {
 
     setTool(tool) {
         this.currentTool = tool;
-        // Update toolbar buttons
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tool === tool);
         });
 
-        // Update cursor
         const cursorMap = {
-            select: 'default',
-            pan: 'grab',
-            sticky: 'crosshair',
-            rect: 'crosshair',
-            circle: 'crosshair',
-            line: 'crosshair',
-            arrow: 'crosshair',
-            draw: 'crosshair',
-            text: 'text',
+            select: 'default', pan: 'grab',
+            sticky: 'crosshair', rect: 'crosshair', circle: 'crosshair',
+            triangle: 'crosshair', diamond: 'crosshair', star: 'crosshair', hexagon: 'crosshair',
+            line: 'crosshair', arrow: 'crosshair',
+            draw: 'crosshair', text: 'text', textbox: 'crosshair',
         };
         this.app.canvas.style.cursor = cursorMap[tool] || 'default';
 
-        // Hide color/stroke pickers unless relevant
-        if (tool !== 'color') {
-            document.getElementById('color-picker')?.classList.remove('visible');
-        }
-        if (tool !== 'stroke-width') {
-            document.getElementById('stroke-picker')?.classList.remove('visible');
-        }
+        if (tool !== 'color') document.getElementById('color-picker')?.classList.remove('visible');
+        if (tool !== 'stroke-width') document.getElementById('stroke-picker')?.classList.remove('visible');
+        if (tool !== 'fill-color') document.getElementById('fill-picker')?.classList.remove('visible');
     }
 
     setupToolbarEvents() {
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool;
+                if (!tool) return;
                 if (tool === 'color') {
                     document.getElementById('color-picker')?.classList.toggle('visible');
                     document.getElementById('stroke-picker')?.classList.remove('visible');
+                    document.getElementById('fill-picker')?.classList.remove('visible');
                     return;
                 }
                 if (tool === 'stroke-width') {
                     document.getElementById('stroke-picker')?.classList.toggle('visible');
                     document.getElementById('color-picker')?.classList.remove('visible');
+                    document.getElementById('fill-picker')?.classList.remove('visible');
+                    return;
+                }
+                if (tool === 'fill-color') {
+                    document.getElementById('fill-picker')?.classList.toggle('visible');
+                    document.getElementById('color-picker')?.classList.remove('visible');
+                    document.getElementById('stroke-picker')?.classList.remove('visible');
                     return;
                 }
                 this.setTool(tool);
             });
         });
 
-        // Color swatches
-        document.querySelectorAll('.color-swatch').forEach(swatch => {
+        // Stroke color swatches
+        document.querySelectorAll('#color-picker .color-swatch').forEach(swatch => {
             swatch.addEventListener('click', () => {
                 const color = swatch.dataset.color;
                 this.app.currentColor = color;
-                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                document.querySelectorAll('#color-picker .color-swatch').forEach(s => s.classList.remove('active'));
                 swatch.classList.add('active');
 
-                // Update color button appearance
                 const colorBtn = document.querySelector('[data-tool="color"] svg circle');
                 if (colorBtn) {
                     colorBtn.setAttribute('fill', color);
                     colorBtn.setAttribute('stroke', color);
                 }
 
-                // Update selected elements' colors
                 for (const id of this.app.selectedIds) {
                     const el = this.app.getElementById(id);
                     if (el) {
@@ -100,8 +102,25 @@ export class ToolManager {
                         }
                     }
                 }
-
                 document.getElementById('color-picker')?.classList.remove('visible');
+            });
+        });
+
+        // Fill color swatches
+        document.querySelectorAll('#fill-picker .color-swatch').forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                const fill = swatch.dataset.color;
+                this.app.currentFill = fill;
+                document.querySelectorAll('#fill-picker .color-swatch').forEach(s => s.classList.remove('active'));
+                swatch.classList.add('active');
+
+                for (const id of this.app.selectedIds) {
+                    const el = this.app.getElementById(id);
+                    if (el && el.fill !== undefined) {
+                        this.app.updateElement(id, { fill });
+                    }
+                }
+                document.getElementById('fill-picker')?.classList.remove('visible');
             });
         });
 
@@ -113,8 +132,6 @@ export class ToolManager {
                 const val = parseInt(strokeRange.value);
                 strokeValue.textContent = val;
                 this.app.currentStrokeWidth = val;
-
-                // Update selected elements
                 for (const id of this.app.selectedIds) {
                     const el = this.app.getElementById(id);
                     if (el && el.strokeWidth !== undefined) {
@@ -132,7 +149,6 @@ export class ToolManager {
     setupCanvasEvents() {
         const canvas = this.app.canvas;
 
-        // Space key for temporary pan mode
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !this.spaceDown && e.target === document.body) {
                 this.spaceDown = true;
@@ -144,9 +160,7 @@ export class ToolManager {
         window.addEventListener('keyup', (e) => {
             if (e.code === 'Space') {
                 this.spaceDown = false;
-                if (!this.isPanning) {
-                    this.setTool(this.currentTool); // restore cursor
-                }
+                if (!this.isPanning) this.setTool(this.currentTool);
             }
         });
 
@@ -155,13 +169,10 @@ export class ToolManager {
         canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
         canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-
-        // Prevent context menu
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     onMouseDown(e) {
-        const canvas = this.app.canvas;
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
 
@@ -169,41 +180,33 @@ export class ToolManager {
         if (e.button === 1 || this.spaceDown || this.currentTool === 'pan') {
             this.isPanning = true;
             this.panStart = { x: e.clientX, y: e.clientY };
-            canvas.style.cursor = 'grabbing';
+            this.app.canvas.style.cursor = 'grabbing';
             return;
         }
-
         if (e.button !== 0) return;
 
-        switch (this.currentTool) {
-            case 'select':
-                this.onSelectDown(world, e);
-                break;
-            case 'sticky':
-                this.onStickyDown(world);
-                break;
-            case 'rect':
-            case 'circle':
-                this.onShapeDown(world);
-                break;
-            case 'line':
-            case 'arrow':
-                this.onLineDown(world);
-                break;
-            case 'draw':
-                this.onDrawDown(world);
-                break;
-            case 'text':
-                this.onTextDown(world);
-                break;
+        const tool = this.currentTool;
+
+        if (tool === 'select') {
+            this.onSelectDown(world, e);
+        } else if (tool === 'sticky') {
+            this.onStickyDown(world);
+        } else if (SHAPE_TOOLS.has(tool)) {
+            this.onShapeDown(world);
+        } else if (LINE_TOOLS.has(tool)) {
+            this.onLineDown(world);
+        } else if (tool === 'draw') {
+            this.onDrawDown(world);
+        } else if (tool === 'text') {
+            this.onTextDown(world);
+        } else if (tool === 'textbox') {
+            this.onTextBoxDown(world);
         }
     }
 
     onMouseMove(e) {
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
-
-        // Send cursor position for collaboration
         this.app.syncManager.sendCursorPosition(world.x, world.y);
 
         if (this.isPanning) {
@@ -215,21 +218,17 @@ export class ToolManager {
             return;
         }
 
-        switch (this.currentTool) {
-            case 'select':
-                this.onSelectMove(world, e);
-                break;
-            case 'rect':
-            case 'circle':
-                this.onShapeMove(world);
-                break;
-            case 'line':
-            case 'arrow':
-                this.onLineMove(world);
-                break;
-            case 'draw':
-                this.onDrawMove(world);
-                break;
+        const tool = this.currentTool;
+        if (tool === 'select') {
+            this.onSelectMove(world, e);
+        } else if (SHAPE_TOOLS.has(tool)) {
+            this.onShapeMove(world);
+        } else if (LINE_TOOLS.has(tool)) {
+            this.onLineMove(world);
+        } else if (tool === 'draw') {
+            this.onDrawMove(world);
+        } else if (tool === 'textbox') {
+            this.onTextBoxMove(world);
         }
     }
 
@@ -242,31 +241,26 @@ export class ToolManager {
 
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
+        const tool = this.currentTool;
 
-        switch (this.currentTool) {
-            case 'select':
-                this.onSelectUp(world);
-                break;
-            case 'rect':
-            case 'circle':
-                this.onShapeUp(world);
-                break;
-            case 'line':
-            case 'arrow':
-                this.onLineUp(world);
-                break;
-            case 'draw':
-                this.onDrawUp();
-                break;
+        if (tool === 'select') {
+            this.onSelectUp(world);
+        } else if (SHAPE_TOOLS.has(tool)) {
+            this.onShapeUp(world);
+        } else if (LINE_TOOLS.has(tool)) {
+            this.onLineUp(world);
+        } else if (tool === 'draw') {
+            this.onDrawUp();
+        } else if (tool === 'textbox') {
+            this.onTextBoxUp(world);
         }
     }
 
     onDoubleClick(e) {
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
-
         const el = this.app.hitTestElements(world.x, world.y);
-        if (el && (el.type === 'sticky' || el.type === 'text')) {
+        if (el && (el.type === 'sticky' || el.type === 'text' || el.type === 'textbox')) {
             this.startTextEdit(el);
         }
     }
@@ -279,14 +273,11 @@ export class ToolManager {
 
     updateZoomDisplay() {
         const el = document.getElementById('zoom-level');
-        if (el) {
-            el.textContent = Math.round(this.app.camera.zoom * 100) + '%';
-        }
+        if (el) el.textContent = Math.round(this.app.camera.zoom * 100) + '%';
     }
 
     // === Select Tool ===
     onSelectDown(world, e) {
-        // Check for resize handles on selected elements
         for (const id of this.app.selectedIds) {
             const el = this.app.getElementById(id);
             if (el) {
@@ -301,54 +292,34 @@ export class ToolManager {
         }
 
         const hit = this.app.hitTestElements(world.x, world.y);
-
         if (hit) {
             if (e.shiftKey) {
-                // Toggle selection
-                if (this.app.selectedIds.has(hit.id)) {
-                    this.app.selectedIds.delete(hit.id);
-                } else {
-                    this.app.selectedIds.add(hit.id);
-                }
+                if (this.app.selectedIds.has(hit.id)) this.app.selectedIds.delete(hit.id);
+                else this.app.selectedIds.add(hit.id);
             } else if (!this.app.selectedIds.has(hit.id)) {
                 this.app.selectedIds = new Set([hit.id]);
             }
-            // Start drag
             this.isDrawing = true;
             this.dragStart = { x: world.x, y: world.y };
             this.app.canvas.style.cursor = 'move';
         } else {
-            // Start selection rectangle
-            if (!e.shiftKey) {
-                this.app.selectedIds.clear();
-            }
+            if (!e.shiftKey) this.app.selectedIds.clear();
             this.selectionRect = { x1: world.x, y1: world.y, x2: world.x, y2: world.y };
         }
     }
 
-    onSelectMove(world, e) {
+    onSelectMove(world) {
         if (this.resizeHandle && this.dragElement) {
             const el = this.dragElement;
             const dx = world.x - this.resizeStart.x;
             const dy = world.y - this.resizeStart.y;
-
             const updates = {};
-            if (this.resizeHandle.includes('w')) {
-                updates.x = el.x + dx;
-                updates.width = el.width - dx;
-            }
-            if (this.resizeHandle.includes('e')) {
-                updates.width = el.width + dx;
-            }
-            if (this.resizeHandle.includes('n')) {
-                updates.y = el.y + dy;
-                updates.height = el.height - dy;
-            }
-            if (this.resizeHandle.includes('s')) {
-                updates.height = el.height + dy;
-            }
 
-            // Prevent negative dimensions
+            if (this.resizeHandle.includes('w')) { updates.x = el.x + dx; updates.width = el.width - dx; }
+            if (this.resizeHandle.includes('e')) { updates.width = el.width + dx; }
+            if (this.resizeHandle.includes('n')) { updates.y = el.y + dy; updates.height = el.height - dy; }
+            if (this.resizeHandle.includes('s')) { updates.height = el.height + dy; }
+
             if (updates.width !== undefined && updates.width < 10) return;
             if (updates.height !== undefined && updates.height < 10) return;
 
@@ -359,26 +330,14 @@ export class ToolManager {
         }
 
         if (this.isDrawing && this.dragStart) {
-            // Move selected elements
             const dx = world.x - this.dragStart.x;
             const dy = world.y - this.dragStart.y;
-
             for (const id of this.app.selectedIds) {
                 const el = this.app.getElementById(id);
                 if (!el) continue;
-
-                el.x += dx;
-                el.y += dy;
-                if (el.type === 'line' || el.type === 'arrow') {
-                    el.x2 += dx;
-                    el.y2 += dy;
-                }
-                if (el.type === 'drawing') {
-                    for (const p of el.points) {
-                        p.x += dx;
-                        p.y += dy;
-                    }
-                }
+                el.x += dx; el.y += dy;
+                if (el.type === 'line' || el.type === 'arrow') { el.x2 += dx; el.y2 += dy; }
+                if (el.type === 'drawing') { for (const p of el.points) { p.x += dx; p.y += dy; } }
                 this.app.syncManager.updateElement(el);
             }
             this.dragStart = { x: world.x, y: world.y };
@@ -390,33 +349,26 @@ export class ToolManager {
         }
     }
 
-    onSelectUp(world) {
+    onSelectUp() {
         if (this.resizeHandle) {
-            this.resizeHandle = null;
-            this.resizeStart = null;
-            this.dragElement = null;
+            this.resizeHandle = null; this.resizeStart = null; this.dragElement = null;
             this.app.saveHistory();
             return;
         }
-
         if (this.isDrawing) {
-            this.isDrawing = false;
-            this.dragStart = null;
+            this.isDrawing = false; this.dragStart = null;
             this.app.canvas.style.cursor = 'default';
             this.app.saveHistory();
         }
-
         if (this.selectionRect) {
-            const rect = this.selectionRect;
-            const els = this.app.elementsInRect(rect.x1, rect.y1, rect.x2, rect.y2);
-            for (const el of els) {
-                this.app.selectedIds.add(el.id);
-            }
+            const r = this.selectionRect;
+            const els = this.app.elementsInRect(r.x1, r.y1, r.x2, r.y2);
+            for (const el of els) this.app.selectedIds.add(el.id);
             this.selectionRect = null;
         }
     }
 
-    // === Sticky Note Tool ===
+    // === Sticky Note ===
     onStickyDown(world) {
         const sticky = createStickyNote(world.x - 100, world.y - 100, this.app.stickyColor);
         this.app.addElement(sticky);
@@ -424,7 +376,7 @@ export class ToolManager {
         this.setTool('select');
     }
 
-    // === Shape Tools ===
+    // === Shape Tools (rect, circle, triangle, diamond, star, hexagon) ===
     onShapeDown(world) {
         this.isDrawing = true;
         this.dragStart = { x: world.x, y: world.y };
@@ -441,6 +393,7 @@ export class ToolManager {
             color: this.app.currentColor,
             fill: this.app.currentFill,
             strokeWidth: this.app.currentStrokeWidth,
+            points: 5, // for star
         };
     }
 
@@ -450,28 +403,30 @@ export class ToolManager {
 
         const w = Math.abs(world.x - this.dragStart.x);
         const h = Math.abs(world.y - this.dragStart.y);
-
-        if (w < 5 && h < 5) {
-            this.previewElement = null;
-            return;
-        }
+        if (w < 5 && h < 5) { this.previewElement = null; return; }
 
         const x = Math.min(this.dragStart.x, world.x);
         const y = Math.min(this.dragStart.y, world.y);
+        const color = this.app.currentColor;
+        const fill = this.app.currentFill;
 
         let el;
-        if (this.currentTool === 'rect') {
-            el = createRect(x, y, w, h, this.app.currentColor, this.app.currentFill);
-        } else {
-            el = createCircle(x, y, w / 2, h / 2, this.app.currentColor, this.app.currentFill);
-            el.x = x;
-            el.y = y;
-            el.width = w;
-            el.height = h;
+        switch (this.currentTool) {
+            case 'rect': el = createRect(x, y, w, h, color, fill); break;
+            case 'circle':
+                el = createCircle(x, y, w / 2, h / 2, color, fill);
+                el.x = x; el.y = y; el.width = w; el.height = h;
+                break;
+            case 'triangle': el = createTriangle(x, y, w, h, color, fill); break;
+            case 'diamond': el = createDiamond(x, y, w, h, color, fill); break;
+            case 'star': el = createStar(x, y, w, h, color, fill); break;
+            case 'hexagon': el = createHexagon(x, y, w, h, color, fill); break;
         }
 
-        el.strokeWidth = this.app.currentStrokeWidth;
-        this.app.addElement(el);
+        if (el) {
+            el.strokeWidth = this.app.currentStrokeWidth;
+            this.app.addElement(el);
+        }
         this.previewElement = null;
     }
 
@@ -485,10 +440,8 @@ export class ToolManager {
         if (!this.isDrawing || !this.dragStart) return;
         this.previewElement = {
             type: this.currentTool,
-            x: this.dragStart.x,
-            y: this.dragStart.y,
-            x2: world.x,
-            y2: world.y,
+            x: this.dragStart.x, y: this.dragStart.y,
+            x2: world.x, y2: world.y,
             color: this.app.currentColor,
             strokeWidth: this.app.currentStrokeWidth,
         };
@@ -497,12 +450,8 @@ export class ToolManager {
     onLineUp(world) {
         if (!this.isDrawing || !this.dragStart) return;
         this.isDrawing = false;
-
-        const dx = world.x - this.dragStart.x;
-        const dy = world.y - this.dragStart.y;
-        if (Math.hypot(dx, dy) < 5) {
-            this.previewElement = null;
-            return;
+        if (Math.hypot(world.x - this.dragStart.x, world.y - this.dragStart.y) < 5) {
+            this.previewElement = null; return;
         }
 
         let el;
@@ -513,7 +462,6 @@ export class ToolManager {
             el = createArrow(this.dragStart.x, this.dragStart.y, world.x, world.y,
                            this.app.currentColor, this.app.currentStrokeWidth);
         }
-
         this.app.addElement(el);
         this.previewElement = null;
     }
@@ -532,14 +480,8 @@ export class ToolManager {
     onDrawUp() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
-
         if (this.drawPoints.length < 2) return;
-
-        const el = createDrawing(
-            [...this.drawPoints],
-            this.app.currentColor,
-            this.app.currentStrokeWidth
-        );
+        const el = createDrawing([...this.drawPoints], this.app.currentColor, this.app.currentStrokeWidth);
         this.app.addElement(el);
         this.drawPoints = [];
     }
@@ -547,6 +489,46 @@ export class ToolManager {
     // === Text Tool ===
     onTextDown(world) {
         this.startTextInput(world.x, world.y);
+    }
+
+    // === TextBox Tool ===
+    onTextBoxDown(world) {
+        this.isDrawing = true;
+        this.dragStart = { x: world.x, y: world.y };
+    }
+
+    onTextBoxMove(world) {
+        if (!this.isDrawing || !this.dragStart) return;
+        this.previewElement = {
+            type: 'textbox',
+            x: Math.min(this.dragStart.x, world.x),
+            y: Math.min(this.dragStart.y, world.y),
+            width: Math.abs(world.x - this.dragStart.x),
+            height: Math.abs(world.y - this.dragStart.y),
+            color: this.app.currentColor,
+            fill: '#FFFFFF',
+            borderColor: '#cccccc',
+            strokeWidth: 1,
+            content: '',
+        };
+    }
+
+    onTextBoxUp(world) {
+        if (!this.isDrawing || !this.dragStart) return;
+        this.isDrawing = false;
+
+        const w = Math.abs(world.x - this.dragStart.x);
+        const h = Math.abs(world.y - this.dragStart.y);
+        if (w < 20 || h < 20) { this.previewElement = null; return; }
+
+        const x = Math.min(this.dragStart.x, world.x);
+        const y = Math.min(this.dragStart.y, world.y);
+        const el = createTextBox(x, y, w, h, this.app.currentColor, '#FFFFFF');
+        this.app.addElement(el);
+        this.previewElement = null;
+
+        // Immediately open text editing
+        this.startTextEdit(el);
     }
 
     startTextInput(wx, wy) {
@@ -558,6 +540,8 @@ export class ToolManager {
         overlay.style.left = s.x + 'px';
         overlay.style.top = s.y + 'px';
         input.value = '';
+        input.style.width = '';
+        input.style.height = '';
         input.focus();
 
         const submit = () => {
@@ -565,7 +549,6 @@ export class ToolManager {
             overlay.style.display = 'none';
             input.removeEventListener('blur', submit);
             input.removeEventListener('keydown', onKey);
-
             if (text) {
                 const el = createText(wx, wy, text, this.app.currentColor);
                 this.app.addElement(el);
@@ -573,10 +556,7 @@ export class ToolManager {
         };
 
         const onKey = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
             if (e.key === 'Escape') {
                 overlay.style.display = 'none';
                 input.removeEventListener('blur', submit);
@@ -592,15 +572,19 @@ export class ToolManager {
         const overlay = document.getElementById('text-input-overlay');
         const input = document.getElementById('text-input');
         const s = this.app.camera.worldToScreen(el.x, el.y);
+        const cam = this.app.camera;
 
         overlay.style.display = 'block';
         overlay.style.left = s.x + 'px';
         overlay.style.top = s.y + 'px';
         input.value = el.content || '';
-        input.style.width = Math.max(100, el.width * this.app.camera.zoom) + 'px';
-        if (el.type === 'sticky') {
-            input.style.width = el.width * this.app.camera.zoom + 'px';
-            input.style.height = el.height * this.app.camera.zoom + 'px';
+
+        if (el.type === 'sticky' || el.type === 'textbox') {
+            input.style.width = (el.width * cam.zoom) + 'px';
+            input.style.height = (el.height * cam.zoom) + 'px';
+        } else {
+            input.style.width = Math.max(100, (el.width || 100) * cam.zoom) + 'px';
+            input.style.height = '';
         }
         input.focus();
         input.select();
@@ -608,24 +592,20 @@ export class ToolManager {
         const submit = () => {
             const text = input.value;
             overlay.style.display = 'none';
-            input.style.width = '';
-            input.style.height = '';
+            input.style.width = ''; input.style.height = '';
             input.removeEventListener('blur', submit);
             input.removeEventListener('keydown', onKey);
-
             this.app.updateElement(el.id, { content: text });
             this.app.saveHistory();
         };
 
         const onKey = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey && el.type !== 'sticky') {
-                e.preventDefault();
-                submit();
+            if (e.key === 'Enter' && !e.shiftKey && el.type !== 'sticky' && el.type !== 'textbox') {
+                e.preventDefault(); submit();
             }
             if (e.key === 'Escape') {
                 overlay.style.display = 'none';
-                input.style.width = '';
-                input.style.height = '';
+                input.style.width = ''; input.style.height = '';
                 input.removeEventListener('blur', submit);
                 input.removeEventListener('keydown', onKey);
             }
@@ -637,21 +617,11 @@ export class ToolManager {
 
     // === Draw Preview ===
     drawPreview(ctx) {
-        // Draw shape/line preview
         if (this.previewElement) {
-            const el = this.previewElement;
-            if (el.type === 'rect') {
-                this.app.drawRect(ctx, el);
-            } else if (el.type === 'circle') {
-                this.app.drawCircleEl(ctx, el);
-            } else if (el.type === 'line') {
-                this.app.drawLine(ctx, el);
-            } else if (el.type === 'arrow') {
-                this.app.drawArrow(ctx, el);
-            }
+            this.app.drawElement(ctx, this.previewElement);
         }
 
-        // Draw freehand preview
+        // Freehand preview
         if (this.isDrawing && this.currentTool === 'draw' && this.drawPoints.length > 1) {
             const cam = this.app.camera;
             ctx.strokeStyle = this.app.currentColor;
@@ -668,20 +638,17 @@ export class ToolManager {
             ctx.stroke();
         }
 
-        // Draw selection rectangle
+        // Selection rectangle
         if (this.selectionRect) {
             const cam = this.app.camera;
             const s1 = cam.worldToScreen(this.selectionRect.x1, this.selectionRect.y1);
             const s2 = cam.worldToScreen(this.selectionRect.x2, this.selectionRect.y2);
-
             ctx.strokeStyle = '#2196F3';
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.fillStyle = 'rgba(33, 150, 243, 0.08)';
-            const rx = Math.min(s1.x, s2.x);
-            const ry = Math.min(s1.y, s2.y);
-            const rw = Math.abs(s2.x - s1.x);
-            const rh = Math.abs(s2.y - s1.y);
+            const rx = Math.min(s1.x, s2.x), ry = Math.min(s1.y, s2.y);
+            const rw = Math.abs(s2.x - s1.x), rh = Math.abs(s2.y - s1.y);
             ctx.fillRect(rx, ry, rw, rh);
             ctx.strokeRect(rx, ry, rw, rh);
             ctx.setLineDash([]);

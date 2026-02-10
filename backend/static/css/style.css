@@ -142,6 +142,26 @@ html, body {
     display: flex;
 }
 
+/* === Fill Color Picker === */
+#fill-picker {
+    position: fixed;
+    left: 64px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--toolbar-bg);
+    border-radius: 12px;
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 99;
+    box-shadow: var(--shadow-lg);
+}
+
+#fill-picker.visible {
+    display: flex;
+}
+
 .color-swatch {
     width: 28px;
     height: 28px;

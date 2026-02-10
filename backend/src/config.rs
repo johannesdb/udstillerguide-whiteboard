@@ -23,3 +23,69 @@ impl Config {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // Mutex to prevent parallel env var tests from interfering
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_config_from_env_with_all_vars() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::set_var("JWT_SECRET", "mysecret");
+        std::env::set_var("HOST", "127.0.0.1");
+        std::env::set_var("PORT", "8080");
+
+        let config = Config::from_env().expect("should parse config");
+        assert_eq!(config.database_url, "postgres://localhost/test");
+        assert_eq!(config.jwt_secret, "mysecret");
+        assert_eq!(config.host, "127.0.0.1");
+        assert_eq!(config.port, 8080);
+
+        std::env::remove_var("HOST");
+        std::env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_config_defaults() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::set_var("JWT_SECRET", "secret");
+        std::env::remove_var("HOST");
+        std::env::remove_var("PORT");
+
+        let config = Config::from_env().expect("should parse config");
+        assert_eq!(config.host, "0.0.0.0");
+        assert_eq!(config.port, 3000);
+    }
+
+    #[test]
+    fn test_config_missing_database_url() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        std::env::remove_var("DATABASE_URL");
+        std::env::set_var("JWT_SECRET", "secret");
+
+        let result = Config::from_env();
+        assert!(result.is_err());
+
+        // Restore
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+    }
+
+    #[test]
+    fn test_config_missing_jwt_secret() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::remove_var("JWT_SECRET");
+
+        let result = Config::from_env();
+        assert!(result.is_err());
+
+        // Restore
+        std::env::set_var("JWT_SECRET", "secret");
+    }
+}
