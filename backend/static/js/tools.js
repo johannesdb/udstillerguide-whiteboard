@@ -868,9 +868,6 @@ export class ToolManager {
             input.style.width = Math.max(100, (el.width || 100) * cam.zoom) + 'px';
             input.style.height = '';
         }
-        input.focus();
-        input.select();
-
         const cleanup = () => {
             overlay.style.display = 'none';
             input.style.width = ''; input.style.height = '';
@@ -920,8 +917,16 @@ export class ToolManager {
             }
         };
 
-        input.addEventListener('blur', submit);
         input.addEventListener('keydown', onKey);
+
+        // Defer focus and blur listener to next frame so the mousedown/mouseup
+        // cycle completes first — otherwise the mouseup steals focus from the
+        // textarea, firing blur and closing the editor immediately.
+        requestAnimationFrame(() => {
+            input.focus();
+            input.select();
+            input.addEventListener('blur', submit);
+        });
     }
 
     getSelectedConnector() {
