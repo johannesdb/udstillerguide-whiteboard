@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/
 WORKDIR /app
 COPY --from=builder /app/target/release/udstillerguide-whiteboard .
 COPY static/ static/
-COPY --from=frontend /app/static/node_modules/ static/node_modules/
+COPY --from=frontend /app/static/node_modules/@awesome.me/webawesome-pro/dist/ static/vendor/webawesome/
 
 ARG VERSION=dev
 RUN find static/ -name '*.html' -o -name '*.js' -not -path '*/node_modules/*' | xargs sed -i "s/?v=[a-zA-Z0-9_.-]\+/?v=${VERSION}/g"
