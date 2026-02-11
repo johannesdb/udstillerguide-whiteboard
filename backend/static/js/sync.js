@@ -370,7 +370,7 @@ export class SyncManager {
             avatar.initials = (user.username || '?')[0].toUpperCase();
             avatar.label = user.username;
             avatar.style.setProperty('--size', '32px');
-            avatar.style.setProperty('--wa-color-neutral-400', user.color);
+            avatar.style.backgroundColor = user.color;
 
             const tooltip = document.createElement('wa-tooltip');
             tooltip.content = user.username || 'Unknown';

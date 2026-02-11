@@ -5,8 +5,8 @@ import {
     createLine, createArrow, createDrawing, createText, createTextBox,
     createConnector, getAnchorPoints, resolveConnectorEndpoints,
     hitTest, hitTestResizeHandle,
-} from '/js/canvas.js?v=2';
-import { WhiteboardPlugins } from '/js/plugins.js?v=2';
+} from '/js/canvas.js?v=3';
+import { WhiteboardPlugins } from '/js/plugins.js?v=3';
 
 const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
 const LINE_TOOLS = new Set(['line', 'arrow']);

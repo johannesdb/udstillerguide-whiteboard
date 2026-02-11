@@ -1,6 +1,6 @@
 // UI Manager - handles UI overlays, modals, and board-level interactions
-import { apiFetch, getToken, getUser } from '/js/auth.js?v=2';
-import { WhiteboardPlugins } from '/js/plugins.js?v=2';
+import { apiFetch, getToken, getUser } from '/js/auth.js?v=3';
+import { WhiteboardPlugins } from '/js/plugins.js?v=3';
 
 export class UIManager {
     constructor(app) {
@@ -272,27 +272,17 @@ export class UIManager {
     }
 
     showContextMenu(e) {
-        const world = this.app.camera.screenToWorld(e.offsetX, e.offsetY);
-        const hit = this.app.hitTestElements(world.x, world.y);
-        const menu = document.getElementById('context-menu-items');
-        if (!menu) return;
+        try {
+            const world = this.app.camera.screenToWorld(e.offsetX, e.offsetY);
+            const hit = this.app.hitTestElements(world.x, world.y);
+            const menu = document.getElementById('context-menu-items');
+            if (!menu) return;
 
-        menu.innerHTML = '';
+            menu.innerHTML = '';
 
-        if (hit) {
-            // Element context menu
-            if (!this.app.selectedIds.has(hit.id)) {
-                this.app.selectedIds = new Set([hit.id]);
-            }
-
-            const items = [
-                { label: 'Cut', icon: 'scissors', action: () => this._cutSelected() },
-                { label: 'Copy', icon: 'copy', action: () => this._copySelected() },
-                { label: 'Delete', icon: 'trash', action: () => this.app.deleteSelected() },
-                'divider',
-                { label: 'Bring to Front', icon: 'arrow-up-to-line', action: () => this._bringToFront() },
-                { label: 'Send to Back', icon: 'arrow-down-to-line', action: () => this._sendToBack() },
-            ];
+            const items = hit
+                ? this._buildElementMenuItems(hit, world)
+                : this._buildCanvasMenuItems(world);
 
             for (const item of items) {
                 if (item === 'divider') {
@@ -314,44 +304,40 @@ export class UIManager {
                 });
                 menu.appendChild(menuItem);
             }
-        } else {
-            // Canvas context menu
-            const items = [
-                { label: 'Paste', icon: 'paste', action: () => this._paste(world) },
-                'divider',
-                { label: 'Add Sticky Note', icon: 'note-sticky', action: () => this._addStickyAt(world) },
-                { label: 'Add Rectangle', icon: 'square', action: () => this._addRectAt(world) },
-                { label: 'Add Circle', icon: 'circle', action: () => this._addCircleAt(world) },
-                { label: 'Add Text', icon: 'font', action: () => this._addTextAt(world) },
-            ];
 
-            for (const item of items) {
-                if (item === 'divider') {
-                    menu.appendChild(document.createElement('wa-divider'));
-                    continue;
-                }
-                const menuItem = document.createElement('wa-menu-item');
-                menuItem.textContent = item.label;
-                if (item.icon) {
-                    const icon = document.createElement('wa-icon');
-                    icon.slot = 'prefix';
-                    icon.name = item.icon;
-                    icon.variant = 'regular';
-                    menuItem.prepend(icon);
-                }
-                menuItem.addEventListener('click', () => {
-                    item.action();
-                    this._hideContextMenu();
-                });
-                menu.appendChild(menuItem);
-            }
+            // Position and show the dropdown
+            const dropdown = document.getElementById('context-menu');
+            dropdown.style.left = e.clientX + 'px';
+            dropdown.style.top = e.clientY + 'px';
+            dropdown.open = true;
+        } catch (error) {
+            console.error('Context menu error:', error);
         }
+    }
 
-        // Position and show the dropdown
-        const dropdown = document.getElementById('context-menu');
-        dropdown.style.left = e.clientX + 'px';
-        dropdown.style.top = e.clientY + 'px';
-        dropdown.open = true;
+    _buildElementMenuItems(hit, world) {
+        if (!this.app.selectedIds.has(hit.id)) {
+            this.app.selectedIds = new Set([hit.id]);
+        }
+        return [
+            { label: 'Cut', icon: 'scissors', action: () => this._cutSelected() },
+            { label: 'Copy', icon: 'copy', action: () => this._copySelected() },
+            { label: 'Delete', icon: 'trash', action: () => this.app.deleteSelected() },
+            'divider',
+            { label: 'Bring to Front', icon: 'arrow-up-to-line', action: () => this._bringToFront() },
+            { label: 'Send to Back', icon: 'arrow-down-to-line', action: () => this._sendToBack() },
+        ];
+    }
+
+    _buildCanvasMenuItems(world) {
+        return [
+            { label: 'Paste', icon: 'paste', action: () => this._paste(world) },
+            'divider',
+            { label: 'Add Sticky Note', icon: 'note-sticky', action: () => this._addStickyAt(world) },
+            { label: 'Add Rectangle', icon: 'square', action: () => this._addRectAt(world) },
+            { label: 'Add Circle', icon: 'circle', action: () => this._addCircleAt(world) },
+            { label: 'Add Text', icon: 'font', action: () => this._addTextAt(world) },
+        ];
     }
 
     _hideContextMenu() {
@@ -360,100 +346,135 @@ export class UIManager {
     }
 
     _cutSelected() {
-        this._copySelected();
-        this.app.deleteSelected();
+        try {
+            this._copySelected();
+            this.app.deleteSelected();
+        } catch (error) {
+            console.error('Cut failed:', error);
+        }
     }
 
     _copySelected() {
-        const els = [];
-        for (const id of this.app.selectedIds) {
-            const el = this.app.getElementById(id);
-            if (el) els.push(JSON.parse(JSON.stringify(el)));
+        try {
+            const els = [];
+            for (const id of this.app.selectedIds) {
+                const el = this.app.getElementById(id);
+                if (el) els.push(JSON.parse(JSON.stringify(el)));
+            }
+            this._clipboard = els;
+            this.showToast('Copied!', 'neutral');
+        } catch (error) {
+            console.error('Copy failed:', error);
         }
-        this._clipboard = els;
-        this.showToast('Copied!', 'neutral');
     }
 
     _paste(world) {
-        if (!this._clipboard || this._clipboard.length === 0) return;
-        const { createStickyNote } = import('/js/canvas.js?v=3');
-        // Offset pasted elements from original position
-        for (const el of this._clipboard) {
-            const { generateId } = window.__whiteboardApp.constructor;
-            el.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-            el.x = world.x + (el.x - this._clipboard[0].x);
-            el.y = world.y + (el.y - this._clipboard[0].y);
-            this.app.addElement(el);
+        try {
+            if (!this._clipboard || this._clipboard.length === 0) return;
+            // Deep clone so we can paste multiple times
+            const cloned = JSON.parse(JSON.stringify(this._clipboard));
+            const originX = cloned[0].x;
+            const originY = cloned[0].y;
+            for (const el of cloned) {
+                el.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+                el.x = world.x + (el.x - originX);
+                el.y = world.y + (el.y - originY);
+                this.app.addElement(el);
+            }
+        } catch (error) {
+            console.error('Paste failed:', error);
         }
     }
 
     _bringToFront() {
-        const selected = [...this.app.selectedIds];
-        for (const id of selected) {
-            const idx = this.app.elements.findIndex(e => e.id === id);
-            if (idx !== -1) {
-                const [el] = this.app.elements.splice(idx, 1);
-                this.app.elements.push(el);
+        try {
+            const selected = [...this.app.selectedIds];
+            for (const id of selected) {
+                const idx = this.app.elements.findIndex(e => e.id === id);
+                if (idx !== -1) {
+                    const [el] = this.app.elements.splice(idx, 1);
+                    this.app.elements.push(el);
+                }
             }
+            this.app.saveHistory();
+        } catch (error) {
+            console.error('Bring to front failed:', error);
         }
-        this.app.saveHistory();
     }
 
     _sendToBack() {
-        const selected = [...this.app.selectedIds].reverse();
-        for (const id of selected) {
-            const idx = this.app.elements.findIndex(e => e.id === id);
-            if (idx !== -1) {
-                const [el] = this.app.elements.splice(idx, 1);
-                this.app.elements.unshift(el);
+        try {
+            const selected = [...this.app.selectedIds].reverse();
+            for (const id of selected) {
+                const idx = this.app.elements.findIndex(e => e.id === id);
+                if (idx !== -1) {
+                    const [el] = this.app.elements.splice(idx, 1);
+                    this.app.elements.unshift(el);
+                }
             }
+            this.app.saveHistory();
+        } catch (error) {
+            console.error('Send to back failed:', error);
         }
-        this.app.saveHistory();
     }
 
     _addStickyAt(world) {
-        const { createStickyNote } = window.__whiteboardApp ? {} : {};
-        // Import dynamically handled by canvas.js exports
-        const sticky = {
-            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-            type: 'sticky',
-            x: world.x - 100, y: world.y - 100,
-            width: 200, height: 200,
-            color: this.app.stickyColor || '#FFF176',
-            content: '', fontSize: 14, rotation: 0,
-        };
-        this.app.addElement(sticky);
-        this.app.selectedIds = new Set([sticky.id]);
+        try {
+            const sticky = {
+                id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+                type: 'sticky',
+                x: world.x - 100, y: world.y - 100,
+                width: 200, height: 200,
+                color: this.app.stickyColor || '#FFF176',
+                content: '', fontSize: 14, rotation: 0,
+            };
+            this.app.addElement(sticky);
+            this.app.selectedIds = new Set([sticky.id]);
+        } catch (error) {
+            console.error('Add sticky failed:', error);
+        }
     }
 
     _addRectAt(world) {
-        const rect = {
-            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-            type: 'rect',
-            x: world.x - 75, y: world.y - 50,
-            width: 150, height: 100,
-            color: this.app.currentColor, fill: this.app.currentFill,
-            strokeWidth: 2, rotation: 0,
-        };
-        this.app.addElement(rect);
-        this.app.selectedIds = new Set([rect.id]);
+        try {
+            const rect = {
+                id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+                type: 'rect',
+                x: world.x - 75, y: world.y - 50,
+                width: 150, height: 100,
+                color: this.app.currentColor, fill: this.app.currentFill,
+                strokeWidth: 2, rotation: 0,
+            };
+            this.app.addElement(rect);
+            this.app.selectedIds = new Set([rect.id]);
+        } catch (error) {
+            console.error('Add rect failed:', error);
+        }
     }
 
     _addCircleAt(world) {
-        const circle = {
-            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-            type: 'circle',
-            x: world.x - 50, y: world.y - 50,
-            width: 100, height: 100,
-            color: this.app.currentColor, fill: this.app.currentFill,
-            strokeWidth: 2, rotation: 0,
-        };
-        this.app.addElement(circle);
-        this.app.selectedIds = new Set([circle.id]);
+        try {
+            const circle = {
+                id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+                type: 'circle',
+                x: world.x - 50, y: world.y - 50,
+                width: 100, height: 100,
+                color: this.app.currentColor, fill: this.app.currentFill,
+                strokeWidth: 2, rotation: 0,
+            };
+            this.app.addElement(circle);
+            this.app.selectedIds = new Set([circle.id]);
+        } catch (error) {
+            console.error('Add circle failed:', error);
+        }
     }
 
     _addTextAt(world) {
-        this.app.toolManager.startTextInput(world.x, world.y);
+        try {
+            this.app.toolManager.startTextInput(world.x, world.y);
+        } catch (error) {
+            console.error('Add text failed:', error);
+        }
     }
 
     // === Toast Notifications using Web Awesome alerts ===
