@@ -1,7 +1,9 @@
-// Sync Manager - handles Yjs document sync and WebSocket communication
-// Uses CDN-loaded Yjs for collaborative editing
+// Sync Manager - Yjs-based collaborative sync via y-websocket
+// Uses vendored Yjs (Y.Doc + Y.Map) and y-websocket (WebSocketProvider + Awareness)
 
 import { errorHandler } from '/js/error-handler.js?v=2';
+import * as Y from '/js/vendor/yjs.mjs';
+import { WebsocketProvider } from '/js/vendor/y-websocket.mjs';
 
 export class SyncManager {
     constructor(app, options = {}) {
@@ -9,13 +11,22 @@ export class SyncManager {
         this.boardId = options.boardId;
         this.shareToken = options.shareToken;
         this.token = options.token;
-        this.ws = null;
-        this.connected = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
-        this.reconnectDelay = 1000;
-        this.pendingUpdates = [];
-        this.cursorThrottleTimer = null;
+
+        // Yjs document and shared type
+        this.ydoc = new Y.Doc();
+        this.elementsMap = this.ydoc.getMap('elements');
+
+        // Provider (WebSocket + Awareness)
+        this.provider = null;
+
+        // Track whether we've done initial sync
+        this.synced = false;
+
+        // Suppress remote observer while applying local changes
+        this._isLocalChange = false;
+
+        // Track element IDs we just deleted locally (to avoid re-adding from observer)
+        this._pendingDeletes = new Set();
 
         if (this.boardId) {
             this.connect();
@@ -23,238 +34,331 @@ export class SyncManager {
     }
 
     connect() {
-        if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
-            return;
-        }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        let url = `${protocol}//${window.location.host}/ws/${this.boardId}`;
-
-        const params = new URLSearchParams();
-        if (this.token) params.set('token', this.token);
-        if (this.shareToken) params.set('share_token', this.shareToken);
-        if (params.toString()) url += '?' + params.toString();
-
         try {
-            this.ws = new WebSocket(url);
-            this.ws.binaryType = 'arraybuffer';
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
 
-            this.ws.onopen = () => {
-                this.connected = true;
-                this.reconnectAttempts = 0;
-                console.log('WebSocket connected');
+            const params = {};
+            if (this.token) params.token = this.token;
+            if (this.shareToken) params.share_token = this.shareToken;
 
-                // Send full state
-                this.syncFullState(this.app.elements);
+            this.provider = new WebsocketProvider(wsUrl, `ws/${this.boardId}`, this.ydoc, {
+                params,
+                connect: true,
+            });
 
-                // Flush pending updates
-                for (const msg of this.pendingUpdates) {
-                    this.send(msg);
+            // Sync status events
+            this.provider.on('sync', (synced) => {
+                console.log('Yjs sync:', synced ? 'synced' : 'syncing');
+                if (synced && !this.synced) {
+                    this.synced = true;
+                    this._loadFromYMap();
                 }
-                this.pendingUpdates = [];
-            };
+            });
 
-            this.ws.onmessage = (event) => {
-                this.handleMessage(event.data);
-            };
+            this.provider.on('status', ({ status }) => {
+                console.log('Yjs connection:', status);
+            });
 
-            this.ws.onclose = () => {
-                this.connected = false;
-                console.log('WebSocket disconnected');
-                this.scheduleReconnect();
-            };
-
-            this.ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
+            this.provider.on('connection-error', (err) => {
+                console.error('Yjs connection error:', err);
                 errorHandler.report({
                     error_type: 'websocket',
                     severity: 'error',
-                    message: 'WebSocket connection error',
-                    context: { boardId: this.boardId, readyState: this.ws?.readyState },
-                });
-            };
-        } catch (e) {
-            console.error('WebSocket connection failed:', e);
-            this.scheduleReconnect();
-        }
-    }
-
-    scheduleReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('Max reconnect attempts reached');
-            return;
-        }
-
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
-        this.reconnectAttempts++;
-        console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-        setTimeout(() => this.connect(), delay);
-    }
-
-    send(data) {
-        if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(data);
-        } else {
-            this.pendingUpdates.push(data);
-        }
-    }
-
-    handleMessage(data) {
-        try {
-            // Try JSON first
-            let msg;
-            if (typeof data === 'string') {
-                msg = JSON.parse(data);
-            } else if (data instanceof ArrayBuffer) {
-                const text = new TextDecoder().decode(data);
-                try {
-                    msg = JSON.parse(text);
-                } catch {
-                    // Binary sync message - handle as Yjs protocol
-                    return;
-                }
-            }
-
-            if (!msg || !msg.type) return;
-
-            switch (msg.type) {
-                case 'sync_state':
-                    this.handleSyncState(msg);
-                    break;
-                case 'element_add':
-                    this.handleElementAdd(msg);
-                    break;
-                case 'element_update':
-                    this.handleElementUpdate(msg);
-                    break;
-                case 'element_remove':
-                    this.handleElementRemove(msg);
-                    break;
-                case 'cursor':
-                    this.handleCursor(msg);
-                    break;
-                case 'join':
-                    this.handleJoin(msg);
-                    break;
-                case 'leave':
-                    this.handleLeave(msg);
-                    break;
-            }
-        } catch (error) {
-            // Binary Yjs messages that aren't JSON are expected - only report non-parse errors
-            if (error.name !== 'SyntaxError') {
-                errorHandler.report({
-                    error_type: 'ws_message',
-                    severity: 'warning',
-                    message: error.message,
-                    stack_trace: error.stack,
+                    message: 'Yjs WebSocket connection error',
                     context: { boardId: this.boardId },
                 });
-            }
-        }
-    }
+            });
 
-    // === Outgoing Messages ===
+            // Observe Y.Map for remote changes
+            this.elementsMap.observe((event) => {
+                if (this._isLocalChange) return;
 
-    addElement(el) {
-        this.send(JSON.stringify({
-            type: 'element_add',
-            element: el,
-        }));
-    }
+                try {
+                    event.changes.keys.forEach((change, key) => {
+                        if (change.action === 'add' || change.action === 'update') {
+                            if (this._pendingDeletes.has(key)) return;
+                            const raw = this.elementsMap.get(key);
+                            const el = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                            if (!el) return;
 
-    updateElement(el) {
-        this.send(JSON.stringify({
-            type: 'element_update',
-            element: el,
-        }));
-    }
-
-    removeElement(id) {
-        this.send(JSON.stringify({
-            type: 'element_remove',
-            elementId: id,
-        }));
-    }
-
-    syncFullState(elements) {
-        this.send(JSON.stringify({
-            type: 'sync_state',
-            elements: elements,
-        }));
-    }
-
-    sendCursorPosition(x, y) {
-        // Throttle to ~30fps
-        if (this.cursorThrottleTimer) return;
-        this.cursorThrottleTimer = setTimeout(() => {
-            this.cursorThrottleTimer = null;
-        }, 33);
-
-        this.send(JSON.stringify({
-            type: 'cursor',
-            x, y,
-        }));
-    }
-
-    // === Incoming Message Handlers ===
-
-    handleSyncState(msg) {
-        if (msg.elements && Array.isArray(msg.elements)) {
-            // Merge remote state - prefer remote for elements we don't have
-            const localIds = new Set(this.app.elements.map(e => e.id));
-            for (const el of msg.elements) {
-                if (!localIds.has(el.id)) {
-                    this.app.elements.push(el);
+                            const idx = this.app.elements.findIndex(e => e.id === key);
+                            if (idx >= 0) {
+                                this.app.elements[idx] = el;
+                            } else {
+                                this.app.elements.push(el);
+                            }
+                        } else if (change.action === 'delete') {
+                            this.app.elements = this.app.elements.filter(e => e.id !== key);
+                            this.app.selectedIds.delete(key);
+                        }
+                    });
+                } catch (error) {
+                    errorHandler.report({
+                        error_type: 'yjs_observe',
+                        severity: 'warning',
+                        message: error.message,
+                        stack_trace: error.stack,
+                        context: { boardId: this.boardId },
+                    });
                 }
-            }
-        }
-    }
+            });
 
-    handleElementAdd(msg) {
-        if (!msg.element) return;
-        // Check if we already have this element
-        const existing = this.app.elements.find(e => e.id === msg.element.id);
-        if (!existing) {
-            this.app.elements.push(msg.element);
-        }
-    }
+            // Awareness: set local user info
+            this.provider.awareness.setLocalStateField('user', {
+                name: this._getUsername(),
+                color: this._getUserColor(),
+            });
 
-    handleElementUpdate(msg) {
-        if (!msg.element) return;
-        const idx = this.app.elements.findIndex(e => e.id === msg.element.id);
-        if (idx >= 0) {
-            this.app.elements[idx] = msg.element;
-        }
-    }
+            // Awareness: observe remote cursors
+            this.provider.awareness.on('change', () => {
+                try {
+                    this._updateRemoteCursors();
+                } catch (error) {
+                    errorHandler.report({
+                        error_type: 'awareness',
+                        severity: 'warning',
+                        message: error.message,
+                        stack_trace: error.stack,
+                    });
+                }
+            });
 
-    handleElementRemove(msg) {
-        if (!msg.elementId) return;
-        this.app.elements = this.app.elements.filter(e => e.id !== msg.elementId);
-        this.app.selectedIds.delete(msg.elementId);
-    }
+            // Listen for JSON messages (join/leave) on the underlying WebSocket
+            // y-websocket handles binary Yjs messages; text messages pass through
+            this._setupJsonMessageListener();
 
-    handleCursor(msg) {
-        if (msg.userId) {
-            this.app.remoteCursors.set(msg.userId, {
-                x: msg.x,
-                y: msg.y,
-                username: msg.username,
-                color: msg.color,
+        } catch (error) {
+            console.error('Yjs connection failed:', error);
+            errorHandler.report({
+                error_type: 'websocket',
+                severity: 'critical',
+                message: 'Failed to initialize Yjs connection: ' + error.message,
+                stack_trace: error.stack,
+                context: { boardId: this.boardId },
             });
         }
     }
 
-    handleJoin(msg) {
-        console.log(`User joined: ${msg.username}`);
-        this.updatePresenceBar(msg.users);
+    // Load all elements from Y.Map into app.elements on initial sync
+    _loadFromYMap() {
+        try {
+            const elements = [];
+            this.elementsMap.forEach((raw, key) => {
+                const el = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (el) elements.push(el);
+            });
+            // Merge: keep local elements that aren't in Y.Map, add remote ones
+            const localIds = new Set(this.app.elements.map(e => e.id));
+            for (const el of elements) {
+                if (!localIds.has(el.id)) {
+                    this.app.elements.push(el);
+                } else {
+                    // Remote wins on initial sync
+                    const idx = this.app.elements.findIndex(e => e.id === el.id);
+                    if (idx >= 0) this.app.elements[idx] = el;
+                }
+            }
+            console.log(`Loaded ${elements.length} elements from Y.Map`);
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'yjs_load',
+                severity: 'error',
+                message: 'Failed to load elements from Y.Map: ' + error.message,
+                stack_trace: error.stack,
+                context: { boardId: this.boardId },
+            });
+        }
     }
 
-    handleLeave(msg) {
-        console.log(`User left: ${msg.userId}`);
-        this.app.remoteCursors.delete(msg.userId);
-        this.updatePresenceBar(msg.users);
+    // Listen for JSON text messages from server (join/leave events)
+    _setupJsonMessageListener() {
+        // y-websocket's provider.ws is the raw WebSocket.
+        // We intercept its onmessage to catch JSON text frames alongside binary Yjs frames.
+        // y-websocket normally handles all messages, but it ignores text frames.
+        const checkWs = () => {
+            const ws = this.provider?.ws;
+            if (!ws) {
+                // WebSocket not yet created, retry
+                setTimeout(checkWs, 100);
+                return;
+            }
+            const originalOnMessage = ws.onmessage;
+            ws.onmessage = (event) => {
+                // Text frames are JSON (join/leave)
+                if (typeof event.data === 'string') {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        this._handleJsonMessage(msg);
+                    } catch {
+                        // Not JSON, ignore
+                    }
+                    return;
+                }
+                // Binary frames go to y-websocket
+                if (originalOnMessage) originalOnMessage.call(ws, event);
+            };
+        };
+        // Wait for provider to establish connection
+        this.provider.on('status', ({ status }) => {
+            if (status === 'connected') checkWs();
+        });
     }
+
+    _handleJsonMessage(msg) {
+        if (!msg || !msg.type) return;
+        try {
+            switch (msg.type) {
+                case 'join':
+                    console.log(`User joined: ${msg.username}`);
+                    this.updatePresenceBar(msg.users);
+                    break;
+                case 'leave':
+                    console.log(`User left: ${msg.userId}`);
+                    this.app.remoteCursors.delete(msg.userId);
+                    this.updatePresenceBar(msg.users);
+                    break;
+            }
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'ws_message',
+                severity: 'warning',
+                message: error.message,
+                stack_trace: error.stack,
+                context: { boardId: this.boardId },
+            });
+        }
+    }
+
+    // === Outgoing: Element CRUD via Y.Map ===
+
+    addElement(el) {
+        try {
+            this._isLocalChange = true;
+            this.elementsMap.set(el.id, JSON.stringify(el));
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'yjs_write',
+                severity: 'error',
+                message: 'Failed to add element: ' + error.message,
+                context: { elementId: el.id, boardId: this.boardId },
+            });
+        } finally {
+            this._isLocalChange = false;
+        }
+    }
+
+    updateElement(el) {
+        try {
+            this._isLocalChange = true;
+            this.elementsMap.set(el.id, JSON.stringify(el));
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'yjs_write',
+                severity: 'error',
+                message: 'Failed to update element: ' + error.message,
+                context: { elementId: el.id, boardId: this.boardId },
+            });
+        } finally {
+            this._isLocalChange = false;
+        }
+    }
+
+    removeElement(id) {
+        try {
+            this._isLocalChange = true;
+            this._pendingDeletes.add(id);
+            this.elementsMap.delete(id);
+            // Clean up pending delete after a tick
+            setTimeout(() => this._pendingDeletes.delete(id), 100);
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'yjs_write',
+                severity: 'error',
+                message: 'Failed to remove element: ' + error.message,
+                context: { elementId: id, boardId: this.boardId },
+            });
+        } finally {
+            this._isLocalChange = false;
+        }
+    }
+
+    // Sync full state — used by undo/redo to push entire state to Y.Map
+    syncFullState(elements) {
+        try {
+            this._isLocalChange = true;
+            this.ydoc.transact(() => {
+                // Remove elements not in the new state
+                const newIds = new Set(elements.map(e => e.id));
+                this.elementsMap.forEach((_, key) => {
+                    if (!newIds.has(key)) {
+                        this.elementsMap.delete(key);
+                    }
+                });
+                // Add/update all elements
+                for (const el of elements) {
+                    this.elementsMap.set(el.id, JSON.stringify(el));
+                }
+            });
+        } catch (error) {
+            errorHandler.report({
+                error_type: 'yjs_write',
+                severity: 'error',
+                message: 'Failed to sync full state: ' + error.message,
+                context: { boardId: this.boardId },
+            });
+        } finally {
+            this._isLocalChange = false;
+        }
+    }
+
+    // === Cursors via Awareness ===
+
+    sendCursorPosition(x, y) {
+        try {
+            this.provider?.awareness.setLocalStateField('cursor', { x, y });
+        } catch {
+            // Awareness update failures are non-critical
+        }
+    }
+
+    _updateRemoteCursors() {
+        if (!this.provider) return;
+        const states = this.provider.awareness.getStates();
+        const localClientId = this.ydoc.clientID;
+
+        // Clear old cursors and rebuild from awareness
+        this.app.remoteCursors.clear();
+        states.forEach((state, clientId) => {
+            if (clientId === localClientId) return;
+            if (state.cursor && state.user) {
+                this.app.remoteCursors.set(String(clientId), {
+                    x: state.cursor.x,
+                    y: state.cursor.y,
+                    username: state.user.name || '?',
+                    color: state.user.color || '#F44336',
+                });
+            }
+        });
+    }
+
+    _getUsername() {
+        try {
+            const token = this.token;
+            if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload.username || 'User';
+            }
+        } catch { /* ignore */ }
+        return 'Guest';
+    }
+
+    _getUserColor() {
+        const colors = ['#F44336', '#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4', '#E91E63', '#3F51B5'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // === Presence Bar (still from server JSON join/leave) ===
 
     updatePresenceBar(users) {
         const bar = document.getElementById('presence-bar');
@@ -271,17 +375,18 @@ export class SyncManager {
         }
     }
 
-    // Request server to persist board state now (called by auto-save timer)
+    // No-op: persistence is handled by backend via Yjs sync protocol
     requestSave() {
-        this.send(JSON.stringify({
-            type: 'save_request',
-        }));
+        // Backend saves automatically when it receives Yjs updates
     }
 
     disconnect() {
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
+        if (this.provider) {
+            this.provider.destroy();
+            this.provider = null;
+        }
+        if (this.ydoc) {
+            this.ydoc.destroy();
         }
     }
 }

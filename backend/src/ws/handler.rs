@@ -96,21 +96,6 @@ async fn handle_socket(
         }
     }
 
-    // Send saved elements to the connecting client
-    {
-        let doc = room.doc.read().await;
-        let elements = sync::get_all_elements(&doc);
-        if !elements.is_empty() {
-            let sync_msg = serde_json::json!({
-                "type": "sync_state",
-                "elements": elements,
-            });
-            if let Ok(json) = serde_json::to_string(&sync_msg) {
-                let _ = sender.send(Message::Text(json)).await;
-            }
-        }
-    }
-
     // Broadcast join event
     let join_msg = serde_json::json!({
         "type": "join",
@@ -126,9 +111,17 @@ async fn handle_socket(
     let room_doc = room.doc.clone();
 
     // Task: forward broadcast messages to this client
+    // JSON messages (join/leave) are sent as Text frames, Yjs binary as Binary frames
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            if sender.send(Message::Binary(msg)).await.is_err() {
+            let ws_msg = if msg.first() == Some(&b'{') {
+                // JSON text message (join/leave events)
+                Message::Text(String::from_utf8_lossy(&msg).into_owned())
+            } else {
+                // Binary Yjs protocol message
+                Message::Binary(msg)
+            };
+            if sender.send(ws_msg).await.is_err() {
                 break;
             }
         }
@@ -167,6 +160,13 @@ async fn handle_socket(
                         // Broadcast update to all clients
                         let _ = room_tx.send(data);
 
+                        // Log Y.Map state for observability
+                        {
+                            let doc = room_doc.read().await;
+                            let element_count = sync::get_all_elements(&doc).len();
+                            tracing::debug!("Y.Map state: {} elements after sync update", element_count);
+                        }
+
                         // Periodic save to DB
                         save_counter += 1;
                         if save_counter.is_multiple_of(100) {
@@ -188,58 +188,12 @@ async fn handle_socket(
                     }
                 }
                 Message::Text(text) => {
-                    if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) {
-                        match msg.get("type").and_then(|t| t.as_str()) {
-                            Some("save_request") => {
-                                let doc = room_doc.read().await;
-                                let state_bytes = sync::encode_doc_state(&doc);
-                                drop(doc);
-                                if let Err(e) = db::boards::save_yrs_state(&pool, board_id_clone, &state_bytes).await {
-                                    tracing::error!("Auto-save failed: {}", e);
-                                } else {
-                                    tracing::debug!("Auto-save completed for board {}", board_id_clone);
-                                }
-                                continue;
-                            }
-                            Some("element_add") | Some("element_update") => {
-                                if let Some(element) = msg.get("element") {
-                                    if let Some(id) = element.get("id").and_then(|i| i.as_str()) {
-                                        if let Ok(json_str) = serde_json::to_string(element) {
-                                            let doc = room_doc.read().await;
-                                            sync::store_element(&doc, id, &json_str);
-                                        }
-                                    }
-                                }
-                                let _ = room_tx.send(text.into_bytes());
-                            }
-                            Some("element_remove") => {
-                                if let Some(id) = msg.get("elementId").and_then(|i| i.as_str()) {
-                                    let doc = room_doc.read().await;
-                                    sync::remove_element_from_doc(&doc, id);
-                                }
-                                let _ = room_tx.send(text.into_bytes());
-                            }
-                            Some("sync_state") => {
-                                // Merge incoming elements into Y.Map (upsert, don't replace)
-                                if let Some(elements) = msg.get("elements").and_then(|e| e.as_array()) {
-                                    let doc = room_doc.read().await;
-                                    for el in elements {
-                                        if let Some(id) = el.get("id").and_then(|i| i.as_str()) {
-                                            if let Ok(json_str) = serde_json::to_string(el) {
-                                                sync::store_element(&doc, id, &json_str);
-                                            }
-                                        }
-                                    }
-                                }
-                                let _ = room_tx.send(text.into_bytes());
-                            }
-                            _ => {
-                                let _ = room_tx.send(text.into_bytes());
-                            }
-                        }
-                    } else {
-                        let _ = room_tx.send(text.into_bytes());
-                    }
+                    // Text messages from client are no longer expected for element operations
+                    // (all element CRUD now flows through Yjs binary protocol).
+                    // Forward any text messages (e.g. legacy clients) to broadcast.
+                    tracing::debug!("Received text message from client: {}",
+                        text.chars().take(100).collect::<String>());
+                    let _ = room_tx.send(text.into_bytes());
                 }
                 Message::Close(_) => break,
                 _ => {}
