@@ -10,6 +10,7 @@ import { WhiteboardPlugins } from '/js/plugins.js?v=2';
 
 const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
 const LINE_TOOLS = new Set(['line', 'arrow']);
+const CREATION_TOOLS = new Set(['sticky', ...SHAPE_TOOLS, 'textbox']);
 
 export class ToolManager {
     constructor(app) {
@@ -31,6 +32,10 @@ export class ToolManager {
         this.connectorSource = null;      // { elementId, anchor }
         this.connectorHoveredEl = null;    // element being hovered during connector creation
         this.connectorHoveredAnchor = null; // anchor point being hovered
+
+        // Chain mode state
+        this.chainPrevElementId = null;   // last element created in chain mode
+        this.lastMouseWorld = null;       // mouse position for chain preview line
 
         this.setupCanvasEvents();
         this.setupToolbarEvents();
@@ -63,6 +68,10 @@ export class ToolManager {
 
     setTool(tool) {
         this.currentTool = tool;
+        // Clear chain mode when switching to a non-creation tool
+        if (!CREATION_TOOLS.has(tool)) {
+            this.chainPrevElementId = null;
+        }
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tool === tool);
         });
@@ -193,6 +202,10 @@ export class ToolManager {
                 canvas.style.cursor = 'grab';
                 e.preventDefault();
             }
+            if (e.key === 'Escape' && e.target === document.body) {
+                this.chainPrevElementId = null;
+                this.setTool('select');
+            }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -253,6 +266,7 @@ export class ToolManager {
     onMouseMove(e) {
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
+        this.lastMouseWorld = world;
         this.app.syncManager.sendCursorPosition(world.x, world.y);
 
         if (this.isPanning) {
@@ -439,7 +453,16 @@ export class ToolManager {
         const sticky = createStickyNote(world.x - 100, world.y - 100, this.app.stickyColor);
         this.app.addElement(sticky);
         this.app.selectedIds = new Set([sticky.id]);
-        this.setTool('select');
+        // Chain mode: auto-connector from previous element
+        if (this.chainPrevElementId) {
+            const conn = createConnector(
+                this.chainPrevElementId, sticky.id,
+                'auto', 'auto',
+                this.app.currentColor, this.app.currentStrokeWidth
+            );
+            this.app.addElement(conn);
+        }
+        this.chainPrevElementId = sticky.id;
     }
 
     // === Shape Tools (rect, circle, triangle, diamond, star, hexagon) ===
@@ -492,6 +515,16 @@ export class ToolManager {
         if (el) {
             el.strokeWidth = this.app.currentStrokeWidth;
             this.app.addElement(el);
+            // Chain mode: auto-connector from previous element
+            if (this.chainPrevElementId) {
+                const conn = createConnector(
+                    this.chainPrevElementId, el.id,
+                    'auto', 'auto',
+                    this.app.currentColor, this.app.currentStrokeWidth
+                );
+                this.app.addElement(conn);
+            }
+            this.chainPrevElementId = el.id;
         }
         this.previewElement = null;
     }
@@ -591,6 +624,16 @@ export class ToolManager {
         const y = Math.min(this.dragStart.y, world.y);
         const el = createTextBox(x, y, w, h, this.app.currentColor, '#FFFFFF');
         this.app.addElement(el);
+        // Chain mode: auto-connector from previous element
+        if (this.chainPrevElementId) {
+            const conn = createConnector(
+                this.chainPrevElementId, el.id,
+                'auto', 'auto',
+                this.app.currentColor, this.app.currentStrokeWidth
+            );
+            this.app.addElement(conn);
+        }
+        this.chainPrevElementId = el.id;
         this.previewElement = null;
 
         // Immediately open text editing
@@ -862,6 +905,27 @@ export class ToolManager {
     drawPreview(ctx) {
         if (this.previewElement) {
             this.app.drawElement(ctx, this.previewElement);
+        }
+
+        // Chain mode: preview line from previous element to cursor
+        if (this.chainPrevElementId && this.lastMouseWorld && !this.isDrawing) {
+            const prevEl = this.app.getElementById(this.chainPrevElementId);
+            if (prevEl) {
+                const cam = this.app.camera;
+                const cx = prevEl.x + (prevEl.width || 0) / 2;
+                const cy = prevEl.y + (prevEl.height || 0) / 2;
+                const from = cam.worldToScreen(cx, cy);
+                const to = cam.worldToScreen(this.lastMouseWorld.x, this.lastMouseWorld.y);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(33, 150, 243, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(to.x, to.y);
+                ctx.stroke();
+                ctx.restore();
+            }
         }
 
         // Connector tool: draw anchor points on all connectable elements
