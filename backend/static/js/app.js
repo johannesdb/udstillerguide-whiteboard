@@ -1,5 +1,6 @@
 // Main app entry point - handles routing between auth, dashboard, and board views
 import { isLoggedIn, login, register, logout, apiFetch, getUser } from '/js/auth.js?v=2';
+import { errorHandler } from '/js/error-handler.js?v=2';
 
 class App {
     constructor() {

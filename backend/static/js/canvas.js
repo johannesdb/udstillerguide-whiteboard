@@ -6,6 +6,7 @@ import { UIManager } from '/js/ui.js?v=2';
 import { SyncManager } from '/js/sync.js?v=2';
 import { getToken } from '/js/auth.js?v=2';
 import { WhiteboardPlugins } from '/js/plugins.js?v=2';
+import { errorHandler } from '/js/error-handler.js?v=2';
 
 const imageCache = new Map();
 function loadImage(src) {
@@ -677,29 +678,43 @@ export class WhiteboardApp {
 
     // === Render ===
     render() {
-        const ctx = this.ctx;
-        const w = this.canvas.width / (window.devicePixelRatio || 1);
-        const h = this.canvas.height / (window.devicePixelRatio || 1);
+        try {
+            const ctx = this.ctx;
+            const w = this.canvas.width / (window.devicePixelRatio || 1);
+            const h = this.canvas.height / (window.devicePixelRatio || 1);
 
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#f5f5f5';
-        ctx.fillRect(0, 0, w, h);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, w, h);
 
-        this.drawGrid(ctx, w, h);
+            this.drawGrid(ctx, w, h);
 
-        for (const el of this.elements) {
-            if (!this.isVisible(el, w, h)) continue;
-            this.drawElement(ctx, el);
+            for (const el of this.elements) {
+                if (!this.isVisible(el, w, h)) continue;
+                this.drawElement(ctx, el);
+            }
+
+            for (const id of this.selectedIds) {
+                const el = this.getElementById(id);
+                if (el) this.drawSelection(ctx, el);
+            }
+
+            if (this.toolManager) this.toolManager.drawPreview(ctx);
+
+            this.drawRemoteCursors(ctx);
+        } catch (error) {
+            // Report render errors but throttle to avoid flooding at 60fps
+            if (!this._lastRenderError || this._lastRenderError !== error.message) {
+                this._lastRenderError = error.message;
+                errorHandler.report({
+                    error_type: 'render',
+                    severity: 'error',
+                    message: error.message,
+                    stack_trace: error.stack,
+                    context: { elementCount: this.elements.length },
+                });
+            }
         }
-
-        for (const id of this.selectedIds) {
-            const el = this.getElementById(id);
-            if (el) this.drawSelection(ctx, el);
-        }
-
-        if (this.toolManager) this.toolManager.drawPreview(ctx);
-
-        this.drawRemoteCursors(ctx);
 
         requestAnimationFrame(() => this.render());
     }

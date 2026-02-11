@@ -2,6 +2,7 @@ mod api;
 mod auth;
 mod config;
 mod db;
+mod errors;
 mod ws;
 
 use std::sync::Arc;
@@ -67,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
     let public_routes = Router::new()
         .route("/api/auth/register", post(api::users::register))
         .route("/api/auth/login", post(api::users::login))
+        .route("/api/errors", post(api::errors::report_error))
         .route(
             "/api/share/:token",
             get(api::boards::get_board_by_share_token),

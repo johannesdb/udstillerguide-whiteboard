@@ -1,6 +1,8 @@
 // Sync Manager - handles Yjs document sync and WebSocket communication
 // Uses CDN-loaded Yjs for collaborative editing
 
+import { errorHandler } from '/js/error-handler.js?v=2';
+
 export class SyncManager {
     constructor(app, options = {}) {
         this.app = app;
@@ -64,6 +66,12 @@ export class SyncManager {
 
             this.ws.onerror = (err) => {
                 console.error('WebSocket error:', err);
+                errorHandler.report({
+                    error_type: 'websocket',
+                    severity: 'error',
+                    message: 'WebSocket connection error',
+                    context: { boardId: this.boardId, readyState: this.ws?.readyState },
+                });
             };
         } catch (e) {
             console.error('WebSocket connection failed:', e);
@@ -132,8 +140,17 @@ export class SyncManager {
                     this.handleLeave(msg);
                     break;
             }
-        } catch {
-            // Binary Yjs messages that aren't JSON are expected; ignore parse errors
+        } catch (error) {
+            // Binary Yjs messages that aren't JSON are expected - only report non-parse errors
+            if (error.name !== 'SyntaxError') {
+                errorHandler.report({
+                    error_type: 'ws_message',
+                    severity: 'warning',
+                    message: error.message,
+                    stack_trace: error.stack,
+                    context: { boardId: this.boardId },
+                });
+            }
         }
     }
 
