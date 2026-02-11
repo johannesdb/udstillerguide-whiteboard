@@ -96,6 +96,21 @@ async fn handle_socket(
         }
     }
 
+    // Send saved elements to the connecting client
+    {
+        let doc = room.doc.read().await;
+        let elements = sync::get_all_elements(&doc);
+        if !elements.is_empty() {
+            let sync_msg = serde_json::json!({
+                "type": "sync_state",
+                "elements": elements,
+            });
+            if let Ok(json) = serde_json::to_string(&sync_msg) {
+                let _ = sender.send(Message::Text(json)).await;
+            }
+        }
+    }
+
     // Broadcast join event
     let join_msg = serde_json::json!({
         "type": "join",
@@ -173,22 +188,58 @@ async fn handle_socket(
                     }
                 }
                 Message::Text(text) => {
-                    // Check for save_request from auto-save timer
                     if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) {
-                        if msg.get("type").and_then(|t| t.as_str()) == Some("save_request") {
-                            let doc = room_doc.read().await;
-                            let state_bytes = sync::encode_doc_state(&doc);
-                            drop(doc);
-                            if let Err(e) = db::boards::save_yrs_state(&pool, board_id_clone, &state_bytes).await {
-                                tracing::error!("Auto-save failed: {}", e);
-                            } else {
-                                tracing::debug!("Auto-save completed for board {}", board_id_clone);
+                        match msg.get("type").and_then(|t| t.as_str()) {
+                            Some("save_request") => {
+                                let doc = room_doc.read().await;
+                                let state_bytes = sync::encode_doc_state(&doc);
+                                drop(doc);
+                                if let Err(e) = db::boards::save_yrs_state(&pool, board_id_clone, &state_bytes).await {
+                                    tracing::error!("Auto-save failed: {}", e);
+                                } else {
+                                    tracing::debug!("Auto-save completed for board {}", board_id_clone);
+                                }
+                                continue;
                             }
-                            continue;
+                            Some("element_add") | Some("element_update") => {
+                                if let Some(element) = msg.get("element") {
+                                    if let Some(id) = element.get("id").and_then(|i| i.as_str()) {
+                                        if let Ok(json_str) = serde_json::to_string(element) {
+                                            let doc = room_doc.read().await;
+                                            sync::store_element(&doc, id, &json_str);
+                                        }
+                                    }
+                                }
+                                let _ = room_tx.send(text.into_bytes());
+                            }
+                            Some("element_remove") => {
+                                if let Some(id) = msg.get("elementId").and_then(|i| i.as_str()) {
+                                    let doc = room_doc.read().await;
+                                    sync::remove_element_from_doc(&doc, id);
+                                }
+                                let _ = room_tx.send(text.into_bytes());
+                            }
+                            Some("sync_state") => {
+                                // Merge incoming elements into Y.Map (upsert, don't replace)
+                                if let Some(elements) = msg.get("elements").and_then(|e| e.as_array()) {
+                                    let doc = room_doc.read().await;
+                                    for el in elements {
+                                        if let Some(id) = el.get("id").and_then(|i| i.as_str()) {
+                                            if let Ok(json_str) = serde_json::to_string(el) {
+                                                sync::store_element(&doc, id, &json_str);
+                                            }
+                                        }
+                                    }
+                                }
+                                let _ = room_tx.send(text.into_bytes());
+                            }
+                            _ => {
+                                let _ = room_tx.send(text.into_bytes());
+                            }
                         }
+                    } else {
+                        let _ = room_tx.send(text.into_bytes());
                     }
-                    // Forward text messages (JSON custom messages)
-                    let _ = room_tx.send(text.into_bytes());
                 }
                 Message::Close(_) => break,
                 _ => {}

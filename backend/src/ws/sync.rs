@@ -1,9 +1,10 @@
 use anyhow::Result;
 use yrs::encoding::read::Read as YrsRead;
 use yrs::encoding::write::Write as YrsWrite;
+use yrs::Out;
 use yrs::updates::decoder::{Decode, DecoderV1};
 use yrs::updates::encoder::{Encode, Encoder, EncoderV1};
-use yrs::{Doc, ReadTxn, StateVector, Transact, Update};
+use yrs::{Any, Doc, Map, ReadTxn, StateVector, Transact, Update};
 
 // Yjs sync protocol message types
 pub const MSG_SYNC: u8 = 0;
@@ -95,6 +96,35 @@ pub fn create_update_message(update: &[u8]) -> Vec<u8> {
     encoder.write_var(MSG_SYNC_UPDATE as u32);
     encoder.write_buf(update);
     encoder.to_vec()
+}
+
+/// Store an element in the doc's "elements" Y.Map as a JSON string
+pub fn store_element(doc: &Doc, id: &str, element_json: &str) {
+    let map = doc.get_or_insert_map("elements");
+    let mut txn = doc.transact_mut();
+    map.insert(&mut txn, id, element_json);
+}
+
+/// Remove an element from the doc's "elements" Y.Map
+pub fn remove_element_from_doc(doc: &Doc, id: &str) {
+    let map = doc.get_or_insert_map("elements");
+    let mut txn = doc.transact_mut();
+    map.remove(&mut txn, id);
+}
+
+/// Get all elements from the doc's "elements" Y.Map as parsed JSON values
+pub fn get_all_elements(doc: &Doc) -> Vec<serde_json::Value> {
+    let map = doc.get_or_insert_map("elements");
+    let txn = doc.transact();
+    let mut elements = Vec::new();
+    for (_key, value) in map.iter(&txn) {
+        if let Out::Any(Any::String(ref s)) = value {
+            if let Ok(el) = serde_json::from_str::<serde_json::Value>(s.as_ref()) {
+                elements.push(el);
+            }
+        }
+    }
+    elements
 }
 
 #[cfg(test)]
@@ -203,5 +233,74 @@ mod tests {
         let txn2 = doc2.transact();
         assert!(map2.get(&txn2, "el1").is_some());
         assert!(map2.get(&txn2, "el2").is_some());
+    }
+
+    #[test]
+    fn test_store_and_get_elements() {
+        let doc = Doc::new();
+
+        let el1 = r#"{"id":"el1","type":"rect","x":10,"y":20}"#;
+        let el2 = r#"{"id":"el2","type":"sticky","x":100,"y":200}"#;
+
+        store_element(&doc, "el1", el1);
+        store_element(&doc, "el2", el2);
+
+        let elements = get_all_elements(&doc);
+        assert_eq!(elements.len(), 2);
+
+        let ids: Vec<&str> = elements.iter().filter_map(|e| e.get("id").and_then(|i| i.as_str())).collect();
+        assert!(ids.contains(&"el1"));
+        assert!(ids.contains(&"el2"));
+    }
+
+    #[test]
+    fn test_remove_element_from_doc() {
+        let doc = Doc::new();
+
+        store_element(&doc, "el1", r#"{"id":"el1","type":"rect"}"#);
+        store_element(&doc, "el2", r#"{"id":"el2","type":"sticky"}"#);
+        assert_eq!(get_all_elements(&doc).len(), 2);
+
+        remove_element_from_doc(&doc, "el1");
+        let elements = get_all_elements(&doc);
+        assert_eq!(elements.len(), 1);
+        assert_eq!(elements[0].get("id").unwrap().as_str().unwrap(), "el2");
+    }
+
+    #[test]
+    fn test_elements_persist_through_encode_load() {
+        let doc1 = Doc::new();
+        store_element(&doc1, "el1", r#"{"id":"el1","type":"rect","x":10,"y":20}"#);
+        store_element(&doc1, "el2", r#"{"id":"el2","type":"sticky","x":100,"y":200}"#);
+
+        // Encode and load into a new doc
+        let state = encode_doc_state(&doc1);
+        let doc2 = Doc::new();
+        load_doc_state(&doc2, &state).expect("should load state");
+
+        // Elements should survive the roundtrip
+        let elements = get_all_elements(&doc2);
+        assert_eq!(elements.len(), 2);
+
+        let ids: Vec<&str> = elements.iter().filter_map(|e| e.get("id").and_then(|i| i.as_str())).collect();
+        assert!(ids.contains(&"el1"));
+        assert!(ids.contains(&"el2"));
+
+        // Verify field values survived
+        let el1 = elements.iter().find(|e| e.get("id").unwrap().as_str().unwrap() == "el1").unwrap();
+        assert_eq!(el1.get("x").unwrap().as_i64().unwrap(), 10);
+        assert_eq!(el1.get("type").unwrap().as_str().unwrap(), "rect");
+    }
+
+    #[test]
+    fn test_store_element_overwrites_existing() {
+        let doc = Doc::new();
+
+        store_element(&doc, "el1", r#"{"id":"el1","x":10}"#);
+        store_element(&doc, "el1", r#"{"id":"el1","x":50}"#);
+
+        let elements = get_all_elements(&doc);
+        assert_eq!(elements.len(), 1);
+        assert_eq!(elements[0].get("x").unwrap().as_i64().unwrap(), 50);
     }
 }
