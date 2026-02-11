@@ -12,6 +12,7 @@ echo "==> Deploying to $SERVER..."
 ssh "$SERVER" "sudo bash -c '
   cd $REMOTE_DIR &&
   git pull origin $BRANCH &&
+  export GIT_HASH=\$(git rev-parse --short HEAD) &&
   docker compose up -d --build app
 '"
 
