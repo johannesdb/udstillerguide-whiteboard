@@ -19,6 +19,7 @@ services:
       context: ./backend
       args:
         VERSION: ${GIT_HASH:-dev}
+        WEBAWESOME_NPM_TOKEN: ${WEBAWESOME_NPM_TOKEN}
     environment:
       DATABASE_URL: postgres://whiteboard:${DB_PASSWORD:-changeme}@db:5432/whiteboard
       JWT_SECRET: ${JWT_SECRET:-super-secret-change-in-production}
