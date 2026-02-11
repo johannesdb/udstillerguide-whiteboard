@@ -247,6 +247,9 @@ export class UIManager {
                     });
 
                     item.querySelector('.regenerate-link').addEventListener('click', async (e) => {
+                        if (!confirm('This will invalidate the current share link. Anyone with the old link will lose access. Continue?')) {
+                            return;
+                        }
                         try {
                             const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.target.dataset.id}/regenerate`, {
                                 method: 'POST',
@@ -258,8 +261,12 @@ export class UIManager {
                                 await navigator.clipboard.writeText(newUrl).catch(() => {});
                                 this.showToast('Share link reset and new link copied!');
                             } else {
-                                const err = await res.json();
-                                this.showToast(err.error || 'Failed to reset link');
+                                try {
+                                    const err = await res.json();
+                                    this.showToast(err.error || 'Failed to reset link');
+                                } catch {
+                                    this.showToast('Failed to reset link');
+                                }
                             }
                         } catch (err) {
                             this.showToast('Failed to reset link');

@@ -13,6 +13,21 @@ use crate::auth;
 use crate::db;
 use crate::ws::handler::AppState;
 
+fn generate_share_token() -> String {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..64)
+        .map(|_| {
+            let idx = rng.gen_range(0..36);
+            if idx < 10 {
+                (b'0' + idx) as char
+            } else {
+                (b'a' + idx - 10) as char
+            }
+        })
+        .collect()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateBoardRequest {
     pub name: String,
@@ -465,20 +480,7 @@ pub async fn create_share_link(
             },
         };
 
-    let token: String = {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        (0..64)
-            .map(|_| {
-                let idx = rng.gen_range(0..36);
-                if idx < 10 {
-                    (b'0' + idx) as char
-                } else {
-                    (b'a' + idx - 10) as char
-                }
-            })
-            .collect()
-    };
+    let token = generate_share_token();
 
     let role = body.role.unwrap_or_else(|| "viewer".to_string());
     let expires_at = body
@@ -603,23 +605,20 @@ pub async fn regenerate_share_link(
         }
     }
 
-    let new_token: String = {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        (0..64)
-            .map(|_| {
-                let idx = rng.gen_range(0..36);
-                if idx < 10 {
-                    (b'0' + idx) as char
-                } else {
-                    (b'a' + idx - 10) as char
-                }
-            })
-            .collect()
-    };
+    let new_token = generate_share_token();
 
-    match db::boards::regenerate_share_link(&state.pool, link_id, &new_token).await {
-        Ok(Some(link)) => Json(serde_json::to_value(link).unwrap()).into_response(),
+    match db::boards::regenerate_share_link(&state.pool, board_id, link_id, &new_token).await {
+        Ok(Some(link)) => match serde_json::to_value(&link) {
+            Ok(val) => Json(val).into_response(),
+            Err(e) => {
+                tracing::error!("Failed to serialize share link: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": "Internal error"})),
+                )
+                    .into_response()
+            }
+        },
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "Share link not found"})),
