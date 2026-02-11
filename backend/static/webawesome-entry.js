@@ -5,7 +5,8 @@
 import './node_modules/@awesome.me/webawesome-pro/dist/webawesome.loader.js';
 
 // Import all components used in the whiteboard app
-import './node_modules/@awesome.me/webawesome-pro/dist/components/alert/alert.js';
+// wa-alert renamed to wa-callout in WA Pro 3
+import './node_modules/@awesome.me/webawesome-pro/dist/components/callout/callout.js';
 import './node_modules/@awesome.me/webawesome-pro/dist/components/avatar/avatar.js';
 import './node_modules/@awesome.me/webawesome-pro/dist/components/badge/badge.js';
 import './node_modules/@awesome.me/webawesome-pro/dist/components/button/button.js';
