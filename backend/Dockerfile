@@ -27,6 +27,12 @@ WORKDIR /app
 COPY --from=builder /app/target/release/udstillerguide-whiteboard .
 COPY static/ static/
 COPY --from=frontend /app/static/node_modules/@awesome.me/webawesome-pro/dist/ static/vendor/webawesome/
+COPY --from=frontend /app/static/node_modules/@ctrl/tinycolor/dist/module/ static/vendor/tinycolor/
+COPY --from=frontend /app/static/node_modules/@floating-ui/core/dist/ static/vendor/floating-ui-core/
+COPY --from=frontend /app/static/node_modules/@floating-ui/dom/dist/ static/vendor/floating-ui-dom/
+COPY --from=frontend /app/static/node_modules/@floating-ui/utils/dist/ static/vendor/floating-ui-utils/
+COPY --from=frontend /app/static/node_modules/@shoelace-style/animations/dist/ static/vendor/shoelace-animations/
+COPY --from=frontend /app/static/node_modules/@shoelace-style/localize/dist/ static/vendor/shoelace-localize/
 
 ARG VERSION=dev
 RUN find static/ -name '*.html' -o -name '*.js' -not -path '*/node_modules/*' | xargs sed -i "s/?v=[a-zA-Z0-9_.-]\+/?v=${VERSION}/g"
