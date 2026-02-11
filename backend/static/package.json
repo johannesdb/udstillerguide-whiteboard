@@ -2,5 +2,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/"
+  },
+  "dependencies": {
+    "@awesome.me/webawesome-pro": "^3.2.1"
   }
 }

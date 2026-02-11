@@ -1,5 +1,23 @@
 # Whiteboard Project
 
+## Frontend-strategi
+
+**Princip: Fejl skal fanges af compileren, ikke af brugeren.**
+
+- **HTMX + Web Awesome + Askama** er primær frontend-teknologi — al UI-logik lever i Rust
+- **Web Awesome Pro 3** (`@awesome.me/webawesome-pro`) er UI-komponentbibliotek
+  - Web Components — virker nativt med HTMX uden framework-overhead
+  - Brug `<wa-button>`, `<wa-input>`, `<wa-dialog>`, `<wa-card>` osv. direkte i Askama templates
+  - Styling via CSS custom properties (theming)
+  - npm-pakke fra Cloudsmith registry (kræver `WEBAWESOME_NPM_TOKEN`)
+- **Server-side rendering** — HTML genereres i typechecked Rust-templates
+- **Ingen SPA-framework** — ingen React/Vue/Angular
+- **JavaScript kun hvor strengt nødvendigt:**
+  - Canvas-operationer (standkort)
+  - Global error-handling (`error-handler.js`)
+  - Browser-API'er der ikke kan erstattes af HTMX
+- **HTMX håndterer dynamik:** partial updates, formularer, søgning, modals via `hx-get`/`hx-post`/`hx-swap`
+
 ## Error Handling Policy
 
 ### Regel: Al kode SKAL have error handling

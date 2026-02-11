@@ -9,24 +9,33 @@ export class UIManager {
         this.setupShareButton();
         this.loadBoardInfo();
         this.setupPluginPanels();
+        this.setupContextMenu();
     }
 
     setupPluginPanels() {
         const panels = WhiteboardPlugins.panels;
         if (!panels || panels.length === 0) return;
 
-        const tabsContainer = document.getElementById('plugin-sidebar-tabs');
-        if (!tabsContainer) return;
+        const tabGroup = document.getElementById('plugin-sidebar-tabs');
+        if (!tabGroup) return;
 
-        // Create tabs for each panel
+        // Create tabs and panels for each plugin
         for (const panel of panels) {
-            const tab = document.createElement('button');
-            tab.className = 'sidebar-tab';
-            tab.dataset.panelId = panel.id;
+            const tab = document.createElement('wa-tab');
+            tab.slot = 'nav';
+            tab.panel = panel.id;
             tab.textContent = panel.title || panel.id;
-            tab.addEventListener('click', () => this.activatePanel(panel.id));
-            tabsContainer.appendChild(tab);
+            tabGroup.appendChild(tab);
+
+            const tabPanel = document.createElement('wa-tab-panel');
+            tabPanel.name = panel.id;
+            tabGroup.appendChild(tabPanel);
         }
+
+        tabGroup.addEventListener('wa-tab-show', (e) => {
+            const panelId = e.detail.name;
+            this.activatePanel(panelId);
+        });
 
         // Close button handler
         document.getElementById('plugin-sidebar-close')?.addEventListener('click', () => this.toggleSidebar());
@@ -48,19 +57,13 @@ export class UIManager {
     }
 
     toggleSidebar() {
-        const sidebar = document.getElementById('plugin-sidebar');
-        if (sidebar) {
-            sidebar.classList.toggle('visible');
+        const drawer = document.getElementById('plugin-sidebar');
+        if (drawer) {
+            drawer.open = !drawer.open;
         }
     }
 
     activatePanel(panelId) {
-        // Update tab active states
-        document.querySelectorAll('.sidebar-tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.panelId === panelId);
-        });
-
-        // Clear and render panel content
         const content = document.getElementById('plugin-sidebar-content');
         if (!content) return;
         content.innerHTML = '';
@@ -70,10 +73,10 @@ export class UIManager {
             panel.render(content);
         }
 
-        // Ensure sidebar is visible
-        const sidebar = document.getElementById('plugin-sidebar');
-        if (sidebar && !sidebar.classList.contains('visible')) {
-            sidebar.classList.add('visible');
+        // Ensure drawer is open
+        const drawer = document.getElementById('plugin-sidebar');
+        if (drawer && !drawer.open) {
+            drawer.open = true;
         }
     }
 
@@ -117,95 +120,62 @@ export class UIManager {
     async showShareDialog() {
         if (!this.app.boardId) return;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        const dialog = document.getElementById('share-dialog');
+        if (!dialog) return;
 
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <h2>Share Board</h2>
+        dialog.show();
 
-            <div style="margin-bottom: 16px">
-                <h3 style="font-size:14px; margin-bottom:8px">Add Collaborator</h3>
-                <div style="display:flex; gap:8px">
-                    <input type="text" id="share-username" placeholder="Username" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:4px">
-                    <select id="share-role" style="padding:8px; border:1px solid #ddd; border-radius:4px">
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                    </select>
-                    <button class="btn-primary" id="btn-add-collab" style="padding:8px 16px">Add</button>
-                </div>
-            </div>
+        // Setup event listeners (only once)
+        if (!dialog._listenersSet) {
+            dialog._listenersSet = true;
 
-            <div style="margin-bottom: 16px">
-                <h3 style="font-size:14px; margin-bottom:8px">Share Links</h3>
-                <div id="share-links-list" style="margin-bottom:8px; max-height: 150px; overflow-y: auto"></div>
-                <div style="display:flex; gap:8px">
-                    <select id="link-role" style="padding:8px; border:1px solid #ddd; border-radius:4px">
-                        <option value="viewer">Viewer</option>
-                        <option value="editor">Editor</option>
-                    </select>
-                    <button class="btn-secondary" id="btn-create-link">Create Share Link</button>
-                </div>
-            </div>
+            document.getElementById('btn-close-share').addEventListener('click', () => dialog.hide());
 
-            <div class="modal-actions">
-                <button class="btn-secondary" id="btn-close-share">Close</button>
-            </div>
-        `;
+            // Add collaborator
+            document.getElementById('btn-add-collab').addEventListener('click', async () => {
+                const usernameInput = document.getElementById('share-username');
+                const roleSelect = document.getElementById('share-role');
+                const username = usernameInput.value.trim();
+                const role = roleSelect.value;
+                if (!username) return;
 
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-
-        // Close handlers
-        const close = () => overlay.remove();
-        document.getElementById('btn-close-share').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
-        });
-
-        // Add collaborator
-        document.getElementById('btn-add-collab').addEventListener('click', async () => {
-            const username = document.getElementById('share-username').value.trim();
-            const role = document.getElementById('share-role').value;
-            if (!username) return;
-
-            try {
-                const res = await apiFetch(`/api/boards/${this.app.boardId}/collaborators`, {
-                    method: 'POST',
-                    body: { username, role },
-                });
-                if (res.ok) {
-                    document.getElementById('share-username').value = '';
-                    this.showToast(`Added ${username} as ${role}`);
-                } else {
-                    const err = await res.json();
-                    this.showToast(err.error || 'Failed to add collaborator');
+                try {
+                    const res = await apiFetch(`/api/boards/${this.app.boardId}/collaborators`, {
+                        method: 'POST',
+                        body: { username, role },
+                    });
+                    if (res.ok) {
+                        usernameInput.value = '';
+                        this.showToast(`Added ${username} as ${role}`, 'success');
+                    } else {
+                        const err = await res.json();
+                        this.showToast(err.error || 'Failed to add collaborator', 'warning');
+                    }
+                } catch (e) {
+                    this.showToast('Failed to add collaborator', 'danger');
                 }
-            } catch (e) {
-                this.showToast('Failed to add collaborator');
-            }
-        });
+            });
 
-        // Create share link
-        document.getElementById('btn-create-link').addEventListener('click', async () => {
-            const role = document.getElementById('link-role').value;
-            try {
-                const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links`, {
-                    method: 'POST',
-                    body: { role },
-                });
-                if (res.ok) {
-                    const link = await res.json();
-                    this.loadShareLinks();
-                    const shareUrl = `${window.location.origin}/board.html?id=${this.app.boardId}&share=${link.token}`;
-                    await navigator.clipboard.writeText(shareUrl).catch(() => {});
-                    this.showToast('Share link created and copied!');
+            // Create share link
+            document.getElementById('btn-create-link').addEventListener('click', async () => {
+                const role = document.getElementById('link-role').value;
+                try {
+                    const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links`, {
+                        method: 'POST',
+                        body: { role },
+                    });
+                    if (res.ok) {
+                        const link = await res.json();
+                        this.loadShareLinks();
+                        const shareUrl = `${window.location.origin}/board.html?id=${this.app.boardId}&share=${link.token}`;
+                        await navigator.clipboard.writeText(shareUrl).catch(() => {});
+                        this.showToast('Share link created and copied!', 'success');
+                    }
+                } catch (e) {
+                    this.showToast('Failed to create share link', 'danger');
                 }
-            } catch (e) {
-                this.showToast('Failed to create share link');
-            }
-        });
+            });
+        }
 
         this.loadShareLinks();
     }
@@ -219,7 +189,7 @@ export class UIManager {
             if (res.ok) {
                 const links = await res.json();
                 if (links.length === 0) {
-                    list.innerHTML = '<div style="color:#999; font-size:13px">No share links yet</div>';
+                    list.innerHTML = '<div style="color:var(--wa-color-neutral-500); font-size:13px">No share links yet</div>';
                     return;
                 }
 
@@ -231,19 +201,20 @@ export class UIManager {
                     item.innerHTML = `
                         <span>
                             <code>${link.token.substring(0, 8)}...</code>
-                            <span style="color:#666; margin-left:4px">(${link.role})</span>
+                            <wa-badge variant="neutral" pill>${link.role}</wa-badge>
                         </span>
                         <div style="display:flex; gap:4px">
-                            <button class="copy-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px" data-url="${shareUrl}">Copy</button>
-                            <button class="regenerate-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px; color:#e65100" data-id="${link.id}" title="Generate new code (old link stops working)">Reset</button>
-                            <button class="delete-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px; color:#c62828" data-id="${link.id}">Delete</button>
+                            <wa-icon-button name="copy" label="Copy link" class="copy-link" data-url="${shareUrl}"></wa-icon-button>
+                            <wa-icon-button name="arrows-rotate" label="Reset link" class="regenerate-link" data-id="${link.id}" style="color:var(--wa-color-warning-600)"></wa-icon-button>
+                            <wa-icon-button name="trash" label="Delete link" class="delete-link" data-id="${link.id}" style="color:var(--wa-color-danger-600)"></wa-icon-button>
                         </div>
                     `;
                     list.appendChild(item);
 
                     item.querySelector('.copy-link').addEventListener('click', async (e) => {
-                        await navigator.clipboard.writeText(e.target.dataset.url).catch(() => {});
-                        this.showToast('Link copied!');
+                        const url = e.currentTarget.dataset.url;
+                        await navigator.clipboard.writeText(url).catch(() => {});
+                        this.showToast('Link copied!', 'success');
                     });
 
                     item.querySelector('.regenerate-link').addEventListener('click', async (e) => {
@@ -251,7 +222,7 @@ export class UIManager {
                             return;
                         }
                         try {
-                            const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.target.dataset.id}/regenerate`, {
+                            const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.currentTarget.dataset.id}/regenerate`, {
                                 method: 'POST',
                             });
                             if (res.ok) {
@@ -259,42 +230,275 @@ export class UIManager {
                                 this.loadShareLinks();
                                 const newUrl = `${window.location.origin}/board.html?id=${this.app.boardId}&share=${updated.token}`;
                                 await navigator.clipboard.writeText(newUrl).catch(() => {});
-                                this.showToast('Share link reset and new link copied!');
+                                this.showToast('Share link reset and new link copied!', 'success');
                             } else {
                                 try {
                                     const err = await res.json();
-                                    this.showToast(err.error || 'Failed to reset link');
+                                    this.showToast(err.error || 'Failed to reset link', 'warning');
                                 } catch {
-                                    this.showToast('Failed to reset link');
+                                    this.showToast('Failed to reset link', 'danger');
                                 }
                             }
                         } catch (err) {
-                            this.showToast('Failed to reset link');
+                            this.showToast('Failed to reset link', 'danger');
                         }
                     });
 
                     item.querySelector('.delete-link').addEventListener('click', async (e) => {
                         try {
-                            await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.target.dataset.id}`, {
+                            await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.currentTarget.dataset.id}`, {
                                 method: 'DELETE',
                             });
                             this.loadShareLinks();
                         } catch (err) {
-                            this.showToast('Failed to delete link');
+                            this.showToast('Failed to delete link', 'danger');
                         }
                     });
                 }
             }
         } catch (e) {
-            list.innerHTML = '<div style="color:#c62828; font-size:13px">Failed to load links</div>';
+            list.innerHTML = '<div style="color:var(--wa-color-danger-600); font-size:13px">Failed to load links</div>';
         }
     }
 
-    showToast(message) {
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+    // === Context Menu ===
+
+    setupContextMenu() {
+        const canvas = this.app.canvas;
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showContextMenu(e);
+        });
+    }
+
+    showContextMenu(e) {
+        const world = this.app.camera.screenToWorld(e.offsetX, e.offsetY);
+        const hit = this.app.hitTestElements(world.x, world.y);
+        const menu = document.getElementById('context-menu-items');
+        if (!menu) return;
+
+        menu.innerHTML = '';
+
+        if (hit) {
+            // Element context menu
+            if (!this.app.selectedIds.has(hit.id)) {
+                this.app.selectedIds = new Set([hit.id]);
+            }
+
+            const items = [
+                { label: 'Cut', icon: 'scissors', action: () => this._cutSelected() },
+                { label: 'Copy', icon: 'copy', action: () => this._copySelected() },
+                { label: 'Delete', icon: 'trash', action: () => this.app.deleteSelected() },
+                'divider',
+                { label: 'Bring to Front', icon: 'arrow-up-to-line', action: () => this._bringToFront() },
+                { label: 'Send to Back', icon: 'arrow-down-to-line', action: () => this._sendToBack() },
+            ];
+
+            for (const item of items) {
+                if (item === 'divider') {
+                    menu.appendChild(document.createElement('wa-divider'));
+                    continue;
+                }
+                const menuItem = document.createElement('wa-menu-item');
+                menuItem.textContent = item.label;
+                if (item.icon) {
+                    const icon = document.createElement('wa-icon');
+                    icon.slot = 'prefix';
+                    icon.name = item.icon;
+                    icon.variant = 'regular';
+                    menuItem.prepend(icon);
+                }
+                menuItem.addEventListener('click', () => {
+                    item.action();
+                    this._hideContextMenu();
+                });
+                menu.appendChild(menuItem);
+            }
+        } else {
+            // Canvas context menu
+            const items = [
+                { label: 'Paste', icon: 'paste', action: () => this._paste(world) },
+                'divider',
+                { label: 'Add Sticky Note', icon: 'note-sticky', action: () => this._addStickyAt(world) },
+                { label: 'Add Rectangle', icon: 'square', action: () => this._addRectAt(world) },
+                { label: 'Add Circle', icon: 'circle', action: () => this._addCircleAt(world) },
+                { label: 'Add Text', icon: 'font', action: () => this._addTextAt(world) },
+            ];
+
+            for (const item of items) {
+                if (item === 'divider') {
+                    menu.appendChild(document.createElement('wa-divider'));
+                    continue;
+                }
+                const menuItem = document.createElement('wa-menu-item');
+                menuItem.textContent = item.label;
+                if (item.icon) {
+                    const icon = document.createElement('wa-icon');
+                    icon.slot = 'prefix';
+                    icon.name = item.icon;
+                    icon.variant = 'regular';
+                    menuItem.prepend(icon);
+                }
+                menuItem.addEventListener('click', () => {
+                    item.action();
+                    this._hideContextMenu();
+                });
+                menu.appendChild(menuItem);
+            }
+        }
+
+        // Position and show the dropdown
+        const dropdown = document.getElementById('context-menu');
+        dropdown.style.left = e.clientX + 'px';
+        dropdown.style.top = e.clientY + 'px';
+        dropdown.open = true;
+    }
+
+    _hideContextMenu() {
+        const dropdown = document.getElementById('context-menu');
+        if (dropdown) dropdown.open = false;
+    }
+
+    _cutSelected() {
+        this._copySelected();
+        this.app.deleteSelected();
+    }
+
+    _copySelected() {
+        const els = [];
+        for (const id of this.app.selectedIds) {
+            const el = this.app.getElementById(id);
+            if (el) els.push(JSON.parse(JSON.stringify(el)));
+        }
+        this._clipboard = els;
+        this.showToast('Copied!', 'neutral');
+    }
+
+    _paste(world) {
+        if (!this._clipboard || this._clipboard.length === 0) return;
+        const { createStickyNote } = import('/js/canvas.js?v=3');
+        // Offset pasted elements from original position
+        for (const el of this._clipboard) {
+            const { generateId } = window.__whiteboardApp.constructor;
+            el.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+            el.x = world.x + (el.x - this._clipboard[0].x);
+            el.y = world.y + (el.y - this._clipboard[0].y);
+            this.app.addElement(el);
+        }
+    }
+
+    _bringToFront() {
+        const selected = [...this.app.selectedIds];
+        for (const id of selected) {
+            const idx = this.app.elements.findIndex(e => e.id === id);
+            if (idx !== -1) {
+                const [el] = this.app.elements.splice(idx, 1);
+                this.app.elements.push(el);
+            }
+        }
+        this.app.saveHistory();
+    }
+
+    _sendToBack() {
+        const selected = [...this.app.selectedIds].reverse();
+        for (const id of selected) {
+            const idx = this.app.elements.findIndex(e => e.id === id);
+            if (idx !== -1) {
+                const [el] = this.app.elements.splice(idx, 1);
+                this.app.elements.unshift(el);
+            }
+        }
+        this.app.saveHistory();
+    }
+
+    _addStickyAt(world) {
+        const { createStickyNote } = window.__whiteboardApp ? {} : {};
+        // Import dynamically handled by canvas.js exports
+        const sticky = {
+            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            type: 'sticky',
+            x: world.x - 100, y: world.y - 100,
+            width: 200, height: 200,
+            color: this.app.stickyColor || '#FFF176',
+            content: '', fontSize: 14, rotation: 0,
+        };
+        this.app.addElement(sticky);
+        this.app.selectedIds = new Set([sticky.id]);
+    }
+
+    _addRectAt(world) {
+        const rect = {
+            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            type: 'rect',
+            x: world.x - 75, y: world.y - 50,
+            width: 150, height: 100,
+            color: this.app.currentColor, fill: this.app.currentFill,
+            strokeWidth: 2, rotation: 0,
+        };
+        this.app.addElement(rect);
+        this.app.selectedIds = new Set([rect.id]);
+    }
+
+    _addCircleAt(world) {
+        const circle = {
+            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            type: 'circle',
+            x: world.x - 50, y: world.y - 50,
+            width: 100, height: 100,
+            color: this.app.currentColor, fill: this.app.currentFill,
+            strokeWidth: 2, rotation: 0,
+        };
+        this.app.addElement(circle);
+        this.app.selectedIds = new Set([circle.id]);
+    }
+
+    _addTextAt(world) {
+        this.app.toolManager.startTextInput(world.x, world.y);
+    }
+
+    // === Toast Notifications using Web Awesome alerts ===
+
+    showToast(message, variant = 'neutral') {
+        const stack = document.getElementById('wa-toast-stack');
+        if (!stack) {
+            // Fallback to simple toast
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+            return;
+        }
+
+        const iconMap = {
+            success: 'circle-check',
+            warning: 'triangle-exclamation',
+            danger: 'circle-exclamation',
+            neutral: 'circle-info',
+            primary: 'circle-info',
+        };
+
+        const alert = document.createElement('wa-alert');
+        alert.variant = variant;
+        alert.closable = true;
+        alert.duration = 3000;
+        alert.style.pointerEvents = 'auto';
+
+        const icon = document.createElement('wa-icon');
+        icon.slot = 'icon';
+        icon.name = iconMap[variant] || 'circle-info';
+        icon.variant = 'regular';
+        alert.appendChild(icon);
+
+        alert.appendChild(document.createTextNode(message));
+
+        alert.addEventListener('wa-after-hide', () => alert.remove());
+
+        stack.appendChild(alert);
+
+        // Use requestAnimationFrame to ensure the element is rendered before showing
+        requestAnimationFrame(() => {
+            alert.toast();
+        });
     }
 }

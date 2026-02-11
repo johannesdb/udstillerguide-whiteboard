@@ -111,33 +111,37 @@ class ErrorHandler {
     }
 
     showToast(entry) {
-        let container = document.getElementById('error-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'error-toast-container';
-            container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;';
-            document.body.appendChild(container);
+        const stack = document.getElementById('wa-toast-stack');
+        if (!stack) {
+            // Fallback if wa-toast-stack not yet in DOM
+            console.error(`[ErrorHandler] ${entry.error_type}: ${entry.message}`);
+            return;
         }
 
-        const toast = document.createElement('div');
-        const bg = entry.severity === 'critical' ? '#dc2626' : '#ef4444';
-        toast.style.cssText = `
-            background: ${bg}; color: white; padding: 12px 16px; border-radius: 8px;
-            font-size: 14px; max-width: 350px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            cursor: pointer; opacity: 0; transition: opacity 0.3s ease;
-        `;
-        toast.textContent = `\u26A0 ${entry.error_type}: ${entry.message.substring(0, 100)}`;
-        toast.onclick = () => toast.remove();
-        container.appendChild(toast);
+        const variant = entry.severity === 'critical' ? 'danger' : 'warning';
+        const alert = document.createElement('wa-alert');
+        alert.variant = variant;
+        alert.closable = true;
+        alert.duration = 5000;
+        alert.style.pointerEvents = 'auto';
 
-        // Fade in
-        requestAnimationFrame(() => { toast.style.opacity = '1'; });
+        const icon = document.createElement('wa-icon');
+        icon.slot = 'icon';
+        icon.name = entry.severity === 'critical' ? 'circle-exclamation' : 'triangle-exclamation';
+        icon.variant = 'solid';
+        alert.appendChild(icon);
 
-        // Auto-remove after 5s
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 5000);
+        const strong = document.createElement('strong');
+        strong.textContent = entry.error_type;
+        alert.appendChild(strong);
+        alert.appendChild(document.createTextNode(': ' + entry.message.substring(0, 100)));
+
+        alert.addEventListener('wa-after-hide', () => alert.remove());
+
+        stack.appendChild(alert);
+        requestAnimationFrame(() => {
+            alert.toast();
+        });
     }
 }
 

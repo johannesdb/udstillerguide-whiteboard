@@ -60,6 +60,11 @@ html, body {
     box-shadow: var(--shadow-lg);
 }
 
+/* Web Awesome tooltips inside toolbar */
+#toolbar wa-tooltip {
+    display: contents;
+}
+
 .tool-btn {
     width: 40px;
     height: 40px;
@@ -94,27 +99,6 @@ html, body {
     stroke-linejoin: round;
 }
 
-.tool-btn[title]::after {
-    content: attr(title);
-    position: absolute;
-    left: 52px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--toolbar-bg);
-    color: var(--toolbar-text);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-
-.tool-btn:hover[title]::after {
-    opacity: 1;
-}
-
 .tool-separator {
     width: 28px;
     height: 1px;
@@ -122,7 +106,7 @@ html, body {
     margin: 4px auto;
 }
 
-/* === Color Pickers (stroke & fill) === */
+/* === Color Pickers (Web Awesome) === */
 #color-picker,
 #fill-picker {
     position: fixed;
@@ -131,7 +115,7 @@ html, body {
     transform: translateY(-50%);
     background: var(--toolbar-bg);
     border-radius: 12px;
-    padding: 8px;
+    padding: 12px;
     display: none;
     flex-direction: column;
     gap: 4px;
@@ -144,21 +128,11 @@ html, body {
     display: flex;
 }
 
-.color-swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s;
-}
-
-.color-swatch:hover {
-    transform: scale(1.15);
-}
-
-.color-swatch.active {
-    border-color: white;
+/* Style the wa-color-picker inside the dark toolbar panels */
+#color-picker wa-color-picker,
+#fill-picker wa-color-picker {
+    --wa-input-border-color: #555;
+    --wa-color-neutral-0: var(--toolbar-bg);
 }
 
 /* === Stroke Width Picker === */
@@ -185,8 +159,10 @@ html, body {
     font-size: 11px;
 }
 
-#stroke-picker input[type="range"] {
-    width: 100px;
+/* Style wa-range in the dark panel */
+#stroke-picker wa-range {
+    --wa-color-primary-600: var(--selection-blue);
+    --track-color-active: var(--selection-blue);
 }
 
 /* === Top Bar === */
@@ -205,6 +181,11 @@ html, body {
     box-shadow: var(--shadow);
     color: var(--toolbar-text);
     font-size: 13px;
+}
+
+/* Web Awesome tooltips in top bar */
+#top-bar wa-tooltip {
+    display: contents;
 }
 
 #board-name {
@@ -237,7 +218,7 @@ html, body {
     background: var(--toolbar-hover);
 }
 
-/* === Presence Bar === */
+/* === Presence Bar (Web Awesome Avatars) === */
 #presence-bar {
     position: fixed;
     top: 12px;
@@ -247,6 +228,13 @@ html, body {
     z-index: 100;
 }
 
+#presence-bar wa-avatar {
+    --size: 32px;
+    box-shadow: var(--shadow);
+    border-radius: 50%;
+}
+
+/* Legacy fallback */
 .presence-avatar {
     width: 32px;
     height: 32px;
@@ -304,6 +292,175 @@ html, body {
     background: rgba(33, 150, 243, 0.08);
     pointer-events: none;
     z-index: 50;
+}
+
+/* === Context Menu === */
+#context-menu {
+    z-index: 9999;
+}
+
+#context-menu wa-menu {
+    min-width: 180px;
+}
+
+/* === Share Dialog (Web Awesome) === */
+#share-dialog::part(panel) {
+    border-radius: 12px;
+}
+
+#share-dialog .share-link-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--wa-color-neutral-200, #eee);
+    font-size: 13px;
+}
+
+#share-dialog .share-link-item code {
+    background: var(--wa-color-neutral-100, #f5f5f5);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* === Toast Stack === */
+#wa-toast-stack {
+    pointer-events: none;
+}
+
+#wa-toast-stack wa-alert {
+    pointer-events: auto;
+}
+
+/* Legacy toast fallback */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--toolbar-bg);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 2000;
+    animation: toast-in 0.3s ease-out;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* === Connector Config Panel === */
+#connector-config {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--toolbar-bg);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: none;
+    gap: 12px;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+    color: var(--toolbar-text);
+}
+
+#connector-config.visible {
+    display: flex;
+}
+
+.connector-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.connector-section label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.6;
+}
+
+.marker-group, .line-style-group {
+    display: flex;
+    gap: 2px;
+}
+
+.marker-btn, .line-style-btn {
+    width: 36px;
+    height: 22px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--toolbar-text);
+    transition: background 0.15s, border-color 0.15s;
+    padding: 2px;
+}
+
+.marker-btn:hover, .line-style-btn:hover {
+    background: var(--toolbar-hover);
+}
+
+.marker-btn.active, .line-style-btn.active {
+    background: var(--selection-blue);
+    color: white;
+    border-color: var(--selection-blue);
+}
+
+.marker-btn svg, .line-style-btn svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+}
+
+.line-style-btn {
+    width: 44px;
+}
+
+/* === Plugin Sidebar (Web Awesome Drawer) === */
+#plugin-sidebar {
+    z-index: 150;
+}
+
+#plugin-sidebar::part(panel) {
+    background: white;
+}
+
+#plugin-sidebar-header {
+    border-bottom: 1px solid #eee;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }
 
 /* === Dashboard Styles === */
@@ -558,7 +715,7 @@ html, body {
     text-decoration: underline;
 }
 
-/* === Modal === */
+/* === Legacy Modal (kept for compatibility) === */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -588,208 +745,4 @@ html, body {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 20px;
-}
-
-/* === Share Dialog === */
-.share-link-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-    font-size: 13px;
-}
-
-.share-link-item code {
-    background: #f5f5f5;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-/* === Notifications === */
-.toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: var(--toolbar-bg);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 13px;
-    z-index: 2000;
-    animation: toast-in 0.3s ease-out;
-}
-
-@keyframes toast-in {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* === Connector Config Panel === */
-#connector-config {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--toolbar-bg);
-    border-radius: 12px;
-    padding: 10px 14px;
-    display: none;
-    gap: 12px;
-    z-index: 100;
-    box-shadow: var(--shadow-lg);
-    color: var(--toolbar-text);
-}
-
-#connector-config.visible {
-    display: flex;
-}
-
-.connector-section {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.connector-section label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.6;
-}
-
-.marker-group, .line-style-group {
-    display: flex;
-    gap: 2px;
-}
-
-.marker-btn, .line-style-btn {
-    width: 36px;
-    height: 22px;
-    border: 1px solid transparent;
-    background: transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--toolbar-text);
-    transition: background 0.15s, border-color 0.15s;
-    padding: 2px;
-}
-
-.marker-btn:hover, .line-style-btn:hover {
-    background: var(--toolbar-hover);
-}
-
-.marker-btn.active, .line-style-btn.active {
-    background: var(--selection-blue);
-    color: white;
-    border-color: var(--selection-blue);
-}
-
-.marker-btn svg, .line-style-btn svg {
-    width: 100%;
-    height: 100%;
-    fill: none;
-    stroke: currentColor;
-}
-
-.line-style-btn {
-    width: 44px;
-}
-
-/* === Scrollbar === */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-/* === Plugin Sidebar === */
-#plugin-sidebar {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 320px;
-    height: 100vh;
-    background: white;
-    box-shadow: -2px 0 12px rgba(0,0,0,0.1);
-    z-index: 150;
-    display: none;
-    flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.2s ease-out;
-}
-
-#plugin-sidebar.visible {
-    display: flex;
-    transform: translateX(0);
-}
-
-#plugin-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #eee;
-    min-height: 44px;
-}
-
-#plugin-sidebar-tabs {
-    display: flex;
-    gap: 4px;
-    flex: 1;
-    overflow-x: auto;
-}
-
-.sidebar-tab {
-    padding: 6px 12px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    color: #666;
-    border-radius: 6px;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.sidebar-tab:hover {
-    background: #f0f0f0;
-    color: #333;
-}
-
-.sidebar-tab.active {
-    background: #e3f2fd;
-    color: #1976D2;
-}
-
-#plugin-sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-}
-
-#plugin-sidebar-close {
-    flex-shrink: 0;
 }

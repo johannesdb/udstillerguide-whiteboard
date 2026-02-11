@@ -128,13 +128,12 @@ export class ToolManager {
             });
         });
 
-        // Stroke color swatches
-        document.querySelectorAll('#color-picker .color-swatch').forEach(swatch => {
-            swatch.addEventListener('click', () => {
-                const color = swatch.dataset.color;
+        // Web Awesome color picker - Stroke color
+        const strokePicker = document.getElementById('stroke-color-wa');
+        if (strokePicker) {
+            strokePicker.addEventListener('wa-input', (e) => {
+                const color = e.target.value;
                 this.app.currentColor = color;
-                document.querySelectorAll('#color-picker .color-swatch').forEach(s => s.classList.remove('active'));
-                swatch.classList.add('active');
 
                 const colorBtn = document.querySelector('[data-tool="color"] svg circle');
                 if (colorBtn) {
@@ -149,17 +148,18 @@ export class ToolManager {
                         if (el.type === 'sticky') this.app.stickyColor = color;
                     }
                 }
+            });
+            strokePicker.addEventListener('wa-change', () => {
                 document.getElementById('color-picker')?.classList.remove('visible');
             });
-        });
+        }
 
-        // Fill color swatches
-        document.querySelectorAll('#fill-picker .color-swatch').forEach(swatch => {
-            swatch.addEventListener('click', () => {
-                const fill = swatch.dataset.color;
+        // Web Awesome color picker - Fill color
+        const fillPicker = document.getElementById('fill-color-wa');
+        if (fillPicker) {
+            fillPicker.addEventListener('wa-input', (e) => {
+                const fill = e.target.value;
                 this.app.currentFill = fill;
-                document.querySelectorAll('#fill-picker .color-swatch').forEach(s => s.classList.remove('active'));
-                swatch.classList.add('active');
 
                 for (const id of this.app.selectedIds) {
                     const el = this.app.getElementById(id);
@@ -167,15 +167,17 @@ export class ToolManager {
                         this.app.updateElement(id, { fill });
                     }
                 }
+            });
+            fillPicker.addEventListener('wa-change', () => {
                 document.getElementById('fill-picker')?.classList.remove('visible');
             });
-        });
+        }
 
-        // Stroke width
+        // Stroke width (wa-range)
         const strokeRange = document.getElementById('stroke-range');
         const strokeValue = document.getElementById('stroke-value');
         if (strokeRange) {
-            strokeRange.addEventListener('input', () => {
+            strokeRange.addEventListener('wa-input', () => {
                 const val = parseInt(strokeRange.value);
                 strokeValue.textContent = val;
                 this.app.currentStrokeWidth = val;
@@ -220,7 +222,6 @@ export class ToolManager {
         canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
         canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     onMouseDown(e) {

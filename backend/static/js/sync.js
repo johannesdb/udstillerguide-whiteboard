@@ -366,12 +366,17 @@ export class SyncManager {
 
         bar.innerHTML = '';
         for (const user of users) {
-            const avatar = document.createElement('div');
-            avatar.className = 'presence-avatar';
-            avatar.style.background = user.color;
-            avatar.textContent = (user.username || '?')[0].toUpperCase();
-            avatar.title = user.username;
-            bar.appendChild(avatar);
+            const avatar = document.createElement('wa-avatar');
+            avatar.initials = (user.username || '?')[0].toUpperCase();
+            avatar.label = user.username;
+            avatar.style.setProperty('--size', '32px');
+            avatar.style.setProperty('--wa-color-neutral-400', user.color);
+
+            const tooltip = document.createElement('wa-tooltip');
+            tooltip.content = user.username || 'Unknown';
+            tooltip.appendChild(avatar);
+
+            bar.appendChild(tooltip);
         }
     }
 
