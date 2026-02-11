@@ -7,6 +7,21 @@ ARG WEBAWESOME_NPM_TOKEN
 RUN npm ci --ignore-scripts
 RUN rm -f .npmrc
 
+# Bundle Web Awesome + all deps into a single JS file
+COPY static/webawesome-entry.js ./
+RUN npx esbuild webawesome-entry.js \
+    --bundle \
+    --format=esm \
+    --outfile=vendor/webawesome-bundle.js \
+    --external:react \
+    --external:@lit/react
+
+# Copy Web Awesome CSS and assets (styles, icons, components for autoloader)
+RUN mkdir -p vendor/webawesome && \
+    cp -r node_modules/@awesome.me/webawesome-pro/dist/styles vendor/webawesome/styles && \
+    cp -r node_modules/@awesome.me/webawesome-pro/dist/components vendor/webawesome/components && \
+    cp -r node_modules/@awesome.me/webawesome-pro/dist/chunks vendor/webawesome/chunks
+
 FROM rust:latest AS builder
 
 WORKDIR /app
@@ -26,16 +41,10 @@ RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/
 WORKDIR /app
 COPY --from=builder /app/target/release/udstillerguide-whiteboard .
 COPY static/ static/
-COPY --from=frontend /app/static/node_modules/@awesome.me/webawesome-pro/dist/ static/vendor/webawesome/
-COPY --from=frontend /app/static/node_modules/@ctrl/tinycolor/dist/module/ static/vendor/tinycolor/
-COPY --from=frontend /app/static/node_modules/@floating-ui/core/dist/ static/vendor/floating-ui-core/
-COPY --from=frontend /app/static/node_modules/@floating-ui/dom/dist/ static/vendor/floating-ui-dom/
-COPY --from=frontend /app/static/node_modules/@floating-ui/utils/dist/ static/vendor/floating-ui-utils/
-COPY --from=frontend /app/static/node_modules/@shoelace-style/animations/dist/ static/vendor/shoelace-animations/
-COPY --from=frontend /app/static/node_modules/@shoelace-style/localize/dist/ static/vendor/shoelace-localize/
+COPY --from=frontend /app/static/vendor/ static/vendor/
 
 ARG VERSION=dev
-RUN find static/ -name '*.html' -o -name '*.js' -not -path '*/node_modules/*' | xargs sed -i "s/?v=[a-zA-Z0-9_.-]\+/?v=${VERSION}/g"
+RUN find static/ -name '*.html' -o -name '*.js' -not -path '*/vendor/*' | xargs sed -i "s/?v=[a-zA-Z0-9_.-]\+/?v=${VERSION}/g"
 
 EXPOSE 3000
 
