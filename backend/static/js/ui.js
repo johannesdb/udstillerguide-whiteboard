@@ -204,9 +204,9 @@ export class UIManager {
                             <wa-badge variant="neutral" pill>${link.role}</wa-badge>
                         </span>
                         <div style="display:flex; gap:4px">
-                            <wa-icon-button name="copy" label="Copy link" class="copy-link" data-url="${shareUrl}"></wa-icon-button>
-                            <wa-icon-button name="arrows-rotate" label="Reset link" class="regenerate-link" data-id="${link.id}" style="color:var(--wa-color-warning-600)"></wa-icon-button>
-                            <wa-icon-button name="trash" label="Delete link" class="delete-link" data-id="${link.id}" style="color:var(--wa-color-danger-600)"></wa-icon-button>
+                            <wa-button variant="text" size="small" class="copy-link" data-url="${shareUrl}" label="Copy link"><wa-icon name="copy"></wa-icon></wa-button>
+                            <wa-button variant="text" size="small" class="regenerate-link" data-id="${link.id}" style="color:var(--wa-color-warning-600)" label="Reset link"><wa-icon name="arrows-rotate"></wa-icon></wa-button>
+                            <wa-button variant="text" size="small" class="delete-link" data-id="${link.id}" style="color:var(--wa-color-danger-600)" label="Delete link"><wa-icon name="trash"></wa-icon></wa-button>
                         </div>
                     `;
                     list.appendChild(item);
@@ -289,7 +289,7 @@ export class UIManager {
                     menu.appendChild(document.createElement('wa-divider'));
                     continue;
                 }
-                const menuItem = document.createElement('wa-menu-item');
+                const menuItem = document.createElement('wa-dropdown-item');
                 menuItem.textContent = item.label;
                 if (item.icon) {
                     const icon = document.createElement('wa-icon');
@@ -477,12 +477,11 @@ export class UIManager {
         }
     }
 
-    // === Toast Notifications using Web Awesome alerts ===
+    // === Toast Notifications using Web Awesome callouts ===
 
     showToast(message, variant = 'neutral') {
         const stack = document.getElementById('wa-toast-stack');
         if (!stack) {
-            // Fallback to simple toast
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.textContent = message;
@@ -499,27 +498,27 @@ export class UIManager {
             primary: 'circle-info',
         };
 
-        const alert = document.createElement('wa-alert');
-        alert.variant = variant;
-        alert.closable = true;
-        alert.duration = 3000;
-        alert.style.pointerEvents = 'auto';
+        const callout = document.createElement('wa-callout');
+        callout.variant = variant;
+        callout.closable = true;
+        callout.style.pointerEvents = 'auto';
+        callout.style.transition = 'opacity 0.3s ease';
 
         const icon = document.createElement('wa-icon');
         icon.slot = 'icon';
         icon.name = iconMap[variant] || 'circle-info';
         icon.variant = 'regular';
-        alert.appendChild(icon);
+        callout.appendChild(icon);
 
-        alert.appendChild(document.createTextNode(message));
+        callout.appendChild(document.createTextNode(message));
 
-        alert.addEventListener('wa-after-hide', () => alert.remove());
+        callout.addEventListener('wa-hide', () => callout.remove());
 
-        stack.appendChild(alert);
+        stack.appendChild(callout);
 
-        // Use requestAnimationFrame to ensure the element is rendered before showing
-        requestAnimationFrame(() => {
-            alert.toast();
-        });
+        setTimeout(() => {
+            callout.style.opacity = '0';
+            setTimeout(() => callout.remove(), 300);
+        }, 3000);
     }
 }

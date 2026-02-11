@@ -173,7 +173,7 @@ export class ToolManager {
             });
         }
 
-        // Stroke width (wa-range)
+        // Stroke width (wa-slider)
         const strokeRange = document.getElementById('stroke-range');
         const strokeValue = document.getElementById('stroke-value');
         if (strokeRange) {

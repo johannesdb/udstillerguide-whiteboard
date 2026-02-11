@@ -113,35 +113,36 @@ class ErrorHandler {
     showToast(entry) {
         const stack = document.getElementById('wa-toast-stack');
         if (!stack) {
-            // Fallback if wa-toast-stack not yet in DOM
             console.error(`[ErrorHandler] ${entry.error_type}: ${entry.message}`);
             return;
         }
 
         const variant = entry.severity === 'critical' ? 'danger' : 'warning';
-        const alert = document.createElement('wa-alert');
-        alert.variant = variant;
-        alert.closable = true;
-        alert.duration = 5000;
-        alert.style.pointerEvents = 'auto';
+        const callout = document.createElement('wa-callout');
+        callout.variant = variant;
+        callout.closable = true;
+        callout.style.pointerEvents = 'auto';
+        callout.style.transition = 'opacity 0.3s ease';
 
         const icon = document.createElement('wa-icon');
         icon.slot = 'icon';
         icon.name = entry.severity === 'critical' ? 'circle-exclamation' : 'triangle-exclamation';
         icon.variant = 'solid';
-        alert.appendChild(icon);
+        callout.appendChild(icon);
 
         const strong = document.createElement('strong');
         strong.textContent = entry.error_type;
-        alert.appendChild(strong);
-        alert.appendChild(document.createTextNode(': ' + entry.message.substring(0, 100)));
+        callout.appendChild(strong);
+        callout.appendChild(document.createTextNode(': ' + entry.message.substring(0, 100)));
 
-        alert.addEventListener('wa-after-hide', () => alert.remove());
+        callout.addEventListener('wa-hide', () => callout.remove());
 
-        stack.appendChild(alert);
-        requestAnimationFrame(() => {
-            alert.toast();
-        });
+        stack.appendChild(callout);
+
+        setTimeout(() => {
+            callout.style.opacity = '0';
+            setTimeout(() => callout.remove(), 300);
+        }, 5000);
     }
 }
 
