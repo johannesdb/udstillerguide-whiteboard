@@ -729,8 +729,6 @@ export class ToolManager {
         input.value = el.label || '';
         input.style.width = '120px';
         input.style.height = '';
-        input.focus();
-        input.select();
 
         const submit = () => {
             const text = input.value.trim();
@@ -752,8 +750,12 @@ export class ToolManager {
             }
         };
 
-        input.addEventListener('blur', submit);
         input.addEventListener('keydown', onKey);
+        requestAnimationFrame(() => {
+            input.focus();
+            input.select();
+            input.addEventListener('blur', submit);
+        });
     }
 
     // === Connector Config Panel ===
@@ -824,7 +826,6 @@ export class ToolManager {
         input.value = '';
         input.style.width = '';
         input.style.height = '';
-        input.focus();
 
         const submit = () => {
             const text = input.value.trim();
@@ -846,8 +847,11 @@ export class ToolManager {
             }
         };
 
-        input.addEventListener('blur', submit);
         input.addEventListener('keydown', onKey);
+        requestAnimationFrame(() => {
+            input.focus();
+            input.addEventListener('blur', submit);
+        });
     }
 
     startTextEdit(el, options = {}) {
