@@ -3,7 +3,8 @@ import {
     createStickyNote, createRect, createCircle, createTriangle,
     createDiamond, createStar, createHexagon,
     createLine, createArrow, createDrawing, createText, createTextBox,
-    hitTest, hitTestResizeHandle,
+    createConnector, getAnchorPoints, findNearestAnchor, getConnectorEndpoints,
+    hitTest, hitTestResizeHandle, hitTestConnector,
 } from '/js/canvas.js';
 
 // All shape-type tools that use drag-to-create
@@ -26,8 +27,15 @@ export class ToolManager {
         this.selectionRect = null;
         this.spaceDown = false;
 
+        // Connector tool state
+        this.connectorSource = null;     // { elementId, anchor } when dragging
+        this.connectorHoverEl = null;    // Element being hovered in connector mode
+        this.connectorHoverAnchor = null; // Anchor being hovered
+        this.connectorDragEnd = null;    // Current mouse position during connector drag
+
         this.setupCanvasEvents();
         this.setupToolbarEvents();
+        this.setupConnectorConfigEvents();
     }
 
     setTool(tool) {
@@ -42,6 +50,7 @@ export class ToolManager {
             triangle: 'crosshair', diamond: 'crosshair', star: 'crosshair', hexagon: 'crosshair',
             line: 'crosshair', arrow: 'crosshair',
             draw: 'crosshair', text: 'text', textbox: 'crosshair',
+            connector: 'crosshair',
         };
         this.app.canvas.style.cursor = cursorMap[tool] || 'default';
 
@@ -201,6 +210,8 @@ export class ToolManager {
             this.onTextDown(world);
         } else if (tool === 'textbox') {
             this.onTextBoxDown(world);
+        } else if (tool === 'connector') {
+            this.onConnectorDown(world);
         }
     }
 
@@ -229,6 +240,8 @@ export class ToolManager {
             this.onDrawMove(world);
         } else if (tool === 'textbox') {
             this.onTextBoxMove(world);
+        } else if (tool === 'connector') {
+            this.onConnectorMove(world);
         }
     }
 
@@ -253,6 +266,8 @@ export class ToolManager {
             this.onDrawUp();
         } else if (tool === 'textbox') {
             this.onTextBoxUp(world);
+        } else if (tool === 'connector') {
+            this.onConnectorUp(world);
         }
     }
 
@@ -262,6 +277,8 @@ export class ToolManager {
         const el = this.app.hitTestElements(world.x, world.y);
         if (el && (el.type === 'sticky' || el.type === 'text' || el.type === 'textbox')) {
             this.startTextEdit(el);
+        } else if (el && el.type === 'connector') {
+            this.startConnectorLabelEdit(el);
         }
     }
 
@@ -302,9 +319,11 @@ export class ToolManager {
             this.isDrawing = true;
             this.dragStart = { x: world.x, y: world.y };
             this.app.canvas.style.cursor = 'move';
+            this.updateConnectorConfigPanel();
         } else {
             if (!e.shiftKey) this.app.selectedIds.clear();
             this.selectionRect = { x1: world.x, y1: world.y, x2: world.x, y2: world.y };
+            this.updateConnectorConfigPanel();
         }
     }
 
@@ -353,6 +372,7 @@ export class ToolManager {
         if (this.resizeHandle) {
             this.resizeHandle = null; this.resizeStart = null; this.dragElement = null;
             this.app.saveHistory();
+            this.updateConnectorConfigPanel();
             return;
         }
         if (this.isDrawing) {
@@ -366,6 +386,7 @@ export class ToolManager {
             for (const el of els) this.app.selectedIds.add(el.id);
             this.selectionRect = null;
         }
+        this.updateConnectorConfigPanel();
     }
 
     // === Sticky Note ===
@@ -615,6 +636,187 @@ export class ToolManager {
         input.addEventListener('keydown', onKey);
     }
 
+    // === Connector Tool ===
+    _findHoverElement(world, threshold = 30) {
+        // Find the nearest connectable element within threshold
+        for (let i = this.app.elements.length - 1; i >= 0; i--) {
+            const el = this.app.elements[i];
+            if (el.type === 'connector') continue;
+            const anchors = getAnchorPoints(el);
+            if (anchors.length === 0) continue;
+            for (const a of anchors) {
+                if (Math.hypot(a.x - world.x, a.y - world.y) < threshold / this.app.camera.zoom) {
+                    return { element: el, anchor: a };
+                }
+            }
+        }
+        return null;
+    }
+
+    onConnectorDown(world) {
+        const hit = this._findHoverElement(world);
+        if (hit) {
+            this.connectorSource = { elementId: hit.element.id, anchor: hit.anchor };
+            this.connectorDragEnd = { x: world.x, y: world.y };
+            this.isDrawing = true;
+        }
+    }
+
+    onConnectorMove(world) {
+        // Update hover state for anchor visualization
+        const hit = this._findHoverElement(world);
+        if (hit) {
+            this.connectorHoverEl = hit.element;
+            this.connectorHoverAnchor = hit.anchor;
+            this.app.canvas.style.cursor = 'pointer';
+        } else {
+            this.connectorHoverEl = null;
+            this.connectorHoverAnchor = null;
+            this.app.canvas.style.cursor = 'crosshair';
+        }
+
+        if (this.isDrawing && this.connectorSource) {
+            this.connectorDragEnd = { x: world.x, y: world.y };
+        }
+    }
+
+    onConnectorUp(world) {
+        if (!this.isDrawing || !this.connectorSource) {
+            this.isDrawing = false;
+            return;
+        }
+        this.isDrawing = false;
+
+        const hit = this._findHoverElement(world);
+        if (hit && hit.element.id !== this.connectorSource.elementId) {
+            // Create connector between source and target
+            const conn = createConnector(
+                this.connectorSource.elementId,
+                hit.element.id,
+                {
+                    sourceAnchor: this.connectorSource.anchor.name,
+                    targetAnchor: hit.anchor.name,
+                    color: this.app.currentColor,
+                    strokeWidth: this.app.currentStrokeWidth,
+                }
+            );
+            this.app.addElement(conn);
+            this.app.selectedIds = new Set([conn.id]);
+            this.updateConnectorConfigPanel();
+        }
+
+        this.connectorSource = null;
+        this.connectorDragEnd = null;
+    }
+
+    startConnectorLabelEdit(conn) {
+        const { sx, sy, tx, ty } = getConnectorEndpoints(conn, this.app.elements);
+        const midX = (sx + tx) / 2;
+        const midY = (sy + ty) / 2;
+
+        const overlay = document.getElementById('text-input-overlay');
+        const input = document.getElementById('text-input');
+        const s = this.app.camera.worldToScreen(midX, midY);
+
+        overlay.style.display = 'block';
+        overlay.style.left = (s.x - 60) + 'px';
+        overlay.style.top = (s.y - 16) + 'px';
+        input.value = conn.label || '';
+        input.style.width = '120px';
+        input.style.height = '';
+        input.focus();
+        input.select();
+
+        const submit = () => {
+            const text = input.value;
+            overlay.style.display = 'none';
+            input.style.width = '';
+            input.removeEventListener('blur', submit);
+            input.removeEventListener('keydown', onKey);
+            this.app.updateElement(conn.id, { label: text });
+            this.app.saveHistory();
+        };
+
+        const onKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submit(); }
+            if (e.key === 'Escape') {
+                overlay.style.display = 'none';
+                input.style.width = '';
+                input.removeEventListener('blur', submit);
+                input.removeEventListener('keydown', onKey);
+            }
+        };
+
+        input.addEventListener('blur', submit);
+        input.addEventListener('keydown', onKey);
+    }
+
+    // === Connector Config Panel ===
+    setupConnectorConfigEvents() {
+        const panel = document.getElementById('connector-config');
+        if (!panel) return;
+
+        document.getElementById('conn-start-arrow')?.addEventListener('click', () => {
+            const conn = this._getSelectedConnector();
+            if (conn) {
+                this.app.updateElement(conn.id, { startArrow: !conn.startArrow });
+                this.app.saveHistory();
+                this.updateConnectorConfigPanel();
+            }
+        });
+
+        document.getElementById('conn-end-arrow')?.addEventListener('click', () => {
+            const conn = this._getSelectedConnector();
+            if (conn) {
+                this.app.updateElement(conn.id, { endArrow: !conn.endArrow });
+                this.app.saveHistory();
+                this.updateConnectorConfigPanel();
+            }
+        });
+
+        document.getElementById('conn-line-style')?.addEventListener('change', (e) => {
+            const conn = this._getSelectedConnector();
+            if (conn) {
+                this.app.updateElement(conn.id, { lineStyle: e.target.value });
+                this.app.saveHistory();
+            }
+        });
+
+        document.getElementById('conn-label-input')?.addEventListener('change', (e) => {
+            const conn = this._getSelectedConnector();
+            if (conn) {
+                this.app.updateElement(conn.id, { label: e.target.value });
+                this.app.saveHistory();
+            }
+        });
+    }
+
+    _getSelectedConnector() {
+        if (this.app.selectedIds.size !== 1) return null;
+        const id = [...this.app.selectedIds][0];
+        const el = this.app.getElementById(id);
+        return el && el.type === 'connector' ? el : null;
+    }
+
+    updateConnectorConfigPanel() {
+        const panel = document.getElementById('connector-config');
+        if (!panel) return;
+
+        const conn = this._getSelectedConnector();
+        if (!conn) {
+            panel.classList.remove('visible');
+            return;
+        }
+
+        panel.classList.add('visible');
+        document.getElementById('conn-start-arrow')?.classList.toggle('active', conn.startArrow);
+        document.getElementById('conn-end-arrow')?.classList.toggle('active', conn.endArrow);
+        const styleSelect = document.getElementById('conn-line-style');
+        if (styleSelect) styleSelect.value = conn.lineStyle || 'straight';
+        const labelInput = document.getElementById('conn-label-input');
+        if (labelInput) labelInput.value = conn.label || '';
+    }
+
     // === Draw Preview ===
     drawPreview(ctx) {
         if (this.previewElement) {
@@ -636,6 +838,73 @@ export class ToolManager {
                 ctx.lineTo(s.x, s.y);
             }
             ctx.stroke();
+        }
+
+        // Connector mode: draw anchor points on hovered element
+        if (this.currentTool === 'connector') {
+            // Draw anchors on all connectable elements (subtle)
+            for (const el of this.app.elements) {
+                if (el.type === 'connector') continue;
+                const anchors = getAnchorPoints(el);
+                if (anchors.length === 0) continue;
+                for (const a of anchors) {
+                    const s = cam.worldToScreen(a.x, a.y);
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(33,150,243,0.25)';
+                    ctx.fill();
+                }
+            }
+
+            // Highlight hovered element's anchors
+            if (this.connectorHoverEl) {
+                this.app.drawAnchors(ctx, this.connectorHoverEl, this.connectorHoverAnchor);
+            }
+
+            // Draw connector preview line while dragging
+            if (this.isDrawing && this.connectorSource && this.connectorDragEnd) {
+                const srcEl = this.app.getElementById(this.connectorSource.elementId);
+                if (srcEl) {
+                    const anchor = this.connectorSource.anchor;
+                    const s1 = cam.worldToScreen(anchor.x, anchor.y);
+                    let s2;
+                    if (this.connectorHoverEl && this.connectorHoverAnchor &&
+                        this.connectorHoverEl.id !== this.connectorSource.elementId) {
+                        s2 = cam.worldToScreen(this.connectorHoverAnchor.x, this.connectorHoverAnchor.y);
+                    } else {
+                        s2 = cam.worldToScreen(this.connectorDragEnd.x, this.connectorDragEnd.y);
+                    }
+
+                    ctx.strokeStyle = '#2196F3';
+                    ctx.lineWidth = 2 * cam.zoom;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(s1.x, s1.y);
+                    ctx.lineTo(s2.x, s2.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Arrow preview
+                    const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
+                    const headLen = 10 * cam.zoom;
+                    ctx.fillStyle = '#2196F3';
+                    ctx.beginPath();
+                    ctx.moveTo(s2.x, s2.y);
+                    ctx.lineTo(s2.x - headLen * Math.cos(angle - Math.PI / 6), s2.y - headLen * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(s2.x - headLen * Math.cos(angle + Math.PI / 6), s2.y - headLen * Math.sin(angle + Math.PI / 6));
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Source anchor highlight
+                    ctx.beginPath();
+                    ctx.arc(s1.x, s1.y, 6, 0, Math.PI * 2);
+                    ctx.fillStyle = '#2196F3';
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
         }
 
         // Selection rectangle

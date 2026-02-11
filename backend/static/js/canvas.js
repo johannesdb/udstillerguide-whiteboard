@@ -148,6 +148,92 @@ export function createTextBox(x, y, w, h, color = '#333333', fill = '#FFFFFF') {
     };
 }
 
+export function createConnector(sourceId, targetId, opts = {}) {
+    return {
+        id: generateId(), type: 'connector',
+        sourceId, targetId,
+        sourceAnchor: opts.sourceAnchor || 'auto',
+        targetAnchor: opts.targetAnchor || 'auto',
+        startArrow: opts.startArrow || false,
+        endArrow: opts.endArrow !== undefined ? opts.endArrow : true,
+        label: opts.label || '',
+        color: opts.color || '#333333',
+        strokeWidth: opts.strokeWidth || 2,
+        lineStyle: opts.lineStyle || 'straight',
+        // Fallback positions if source/target is deleted
+        x: 0, y: 0, x2: 0, y2: 0,
+    };
+}
+
+// === Anchor Point System ===
+
+const CONNECTABLE_TYPES = new Set([
+    'sticky', 'rect', 'circle', 'triangle', 'diamond',
+    'star', 'hexagon', 'textbox',
+]);
+
+export function getAnchorPoints(el) {
+    if (!CONNECTABLE_TYPES.has(el.type)) return [];
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    return [
+        { name: 'top', x: cx, y: el.y },
+        { name: 'right', x: el.x + el.width, y: cy },
+        { name: 'bottom', x: cx, y: el.y + el.height },
+        { name: 'left', x: el.x, y: cy },
+        { name: 'center', x: cx, y: cy },
+    ];
+}
+
+export function findNearestAnchor(el, wx, wy) {
+    const anchors = getAnchorPoints(el);
+    if (anchors.length === 0) return null;
+    let best = null;
+    let bestDist = Infinity;
+    for (const a of anchors) {
+        const d = Math.hypot(a.x - wx, a.y - wy);
+        if (d < bestDist) { bestDist = d; best = a; }
+    }
+    return best;
+}
+
+export function getConnectorEndpoints(conn, elements) {
+    const src = elements.find(e => e.id === conn.sourceId);
+    const tgt = elements.find(e => e.id === conn.targetId);
+    let sx, sy, tx, ty;
+
+    if (src) {
+        const anchors = getAnchorPoints(src);
+        if (conn.sourceAnchor === 'auto') {
+            const tgtCenter = tgt
+                ? { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 }
+                : { x: conn.x2, y: conn.y2 };
+            const a = findNearestAnchor(src, tgtCenter.x, tgtCenter.y);
+            sx = a.x; sy = a.y;
+        } else {
+            const a = anchors.find(a => a.name === conn.sourceAnchor) || anchors[0];
+            sx = a.x; sy = a.y;
+        }
+    } else {
+        sx = conn.x; sy = conn.y;
+    }
+
+    if (tgt) {
+        const anchors = getAnchorPoints(tgt);
+        if (conn.targetAnchor === 'auto') {
+            const a = findNearestAnchor(tgt, sx, sy);
+            tx = a.x; ty = a.y;
+        } else {
+            const a = anchors.find(a => a.name === conn.targetAnchor) || anchors[0];
+            tx = a.x; ty = a.y;
+        }
+    } else {
+        tx = conn.x2; ty = conn.y2;
+    }
+
+    return { sx, sy, tx, ty };
+}
+
 // === Hit Testing ===
 
 function pointInRect(px, py, el) {
@@ -278,15 +364,45 @@ export function hitTest(px, py, el, zoom = 1) {
                 width: el.width || el.content.length * el.fontSize * 0.6,
                 height: el.height || el.fontSize * 1.4,
             });
+        case 'connector':
+            return false; // hit tested separately via hitTestConnector
         default:
             return false;
     }
 }
 
+export function hitTestConnector(px, py, conn, elements, zoom = 1) {
+    const { sx, sy, tx, ty } = getConnectorEndpoints(conn, elements);
+    const threshold = 8 / zoom;
+    if (conn.lineStyle === 'curved') {
+        // Approximate bezier with segments
+        const steps = 20;
+        const dx = tx - sx, dy = ty - sy;
+        for (let i = 0; i < steps; i++) {
+            const t0 = i / steps, t1 = (i + 1) / steps;
+            const p0 = bezierPoint(sx, sy, tx, ty, dx, dy, t0);
+            const p1 = bezierPoint(sx, sy, tx, ty, dx, dy, t1);
+            if (pointNearLine(px, py, p0.x, p0.y, p1.x, p1.y, threshold)) return true;
+        }
+        return false;
+    }
+    return pointNearLine(px, py, sx, sy, tx, ty, threshold);
+}
+
+function bezierPoint(sx, sy, tx, ty, dx, dy, t) {
+    const cp1x = sx + dx * 0.4, cp1y = sy;
+    const cp2x = sx + dx * 0.6, cp2y = ty;
+    const u = 1 - t;
+    return {
+        x: u*u*u*sx + 3*u*u*t*cp1x + 3*u*t*t*cp2x + t*t*t*tx,
+        y: u*u*u*sy + 3*u*u*t*cp1y + 3*u*t*t*cp2y + t*t*t*ty,
+    };
+}
+
 // === Resize Handle Hit Test ===
 
 export function hitTestResizeHandle(px, py, el, zoom = 1) {
-    if (el.type === 'line' || el.type === 'arrow' || el.type === 'drawing') return null;
+    if (el.type === 'line' || el.type === 'arrow' || el.type === 'drawing' || el.type === 'connector') return null;
     const handleSize = 8 / zoom;
     const handles = getResizeHandles(el);
     for (const [name, hx, hy] of handles) {
@@ -404,6 +520,7 @@ export class WhiteboardApp {
             const shortcuts = {
                 'v': 'select', 'h': 'pan', 's': 'sticky', 'r': 'rect',
                 'c': 'circle', 'l': 'line', 'a': 'arrow', 'd': 'draw', 't': 'text',
+                'k': 'connector',
             };
             if (shortcuts[e.key] && !e.ctrlKey && !e.metaKey) {
                 this.toolManager.setTool(shortcuts[e.key]);
@@ -439,9 +556,18 @@ export class WhiteboardApp {
 
     deleteSelected() {
         if (this.selectedIds.size === 0) return;
+        const deletedIds = new Set(this.selectedIds);
         for (const id of this.selectedIds) {
             this.elements = this.elements.filter(e => e.id !== id);
             this.syncManager.removeElement(id);
+        }
+        // Also remove connectors that reference deleted elements
+        const orphaned = this.elements.filter(e =>
+            e.type === 'connector' && (deletedIds.has(e.sourceId) || deletedIds.has(e.targetId))
+        );
+        for (const conn of orphaned) {
+            this.elements = this.elements.filter(e => e.id !== conn.id);
+            this.syncManager.removeElement(conn.id);
         }
         this.selectedIds.clear();
         this.saveHistory();
@@ -452,10 +578,24 @@ export class WhiteboardApp {
     }
 
     hitTestElements(wx, wy) {
+        // Check non-connectors first (higher priority)
         for (let i = this.elements.length - 1; i >= 0; i--) {
-            if (hitTest(wx, wy, this.elements[i], this.camera.zoom)) return this.elements[i];
+            const el = this.elements[i];
+            if (el.type === 'connector') continue;
+            if (hitTest(wx, wy, el, this.camera.zoom)) return el;
+        }
+        // Then check connectors
+        for (let i = this.elements.length - 1; i >= 0; i--) {
+            const el = this.elements[i];
+            if (el.type === 'connector' && hitTestConnector(wx, wy, el, this.elements, this.camera.zoom)) return el;
         }
         return null;
+    }
+
+    getConnectorsForElement(elementId) {
+        return this.elements.filter(e =>
+            e.type === 'connector' && (e.sourceId === elementId || e.targetId === elementId)
+        );
     }
 
     // === History (Undo/Redo) ===
@@ -557,6 +697,14 @@ export class WhiteboardApp {
                    Math.max(s1.y, s2.y) >= -margin && Math.min(s1.y, s2.y) <= screenH + margin;
         }
 
+        if (el.type === 'connector') {
+            const { sx, sy, tx, ty } = getConnectorEndpoints(el, this.elements);
+            const s1 = cam.worldToScreen(sx, sy);
+            const s2 = cam.worldToScreen(tx, ty);
+            return Math.max(s1.x, s2.x) >= -margin && Math.min(s1.x, s2.x) <= screenW + margin &&
+                   Math.max(s1.y, s2.y) >= -margin && Math.min(s1.y, s2.y) <= screenH + margin;
+        }
+
         const s = cam.worldToScreen(el.x, el.y);
         const sw = (el.width || 100) * cam.zoom;
         const sh = (el.height || 30) * cam.zoom;
@@ -578,6 +726,7 @@ export class WhiteboardApp {
             case 'drawing': this.drawDrawing(ctx, el); break;
             case 'text': this.drawText(ctx, el); break;
             case 'textbox': this.drawTextBox(ctx, el); break;
+            case 'connector': this.drawConnector(ctx, el); break;
         }
     }
 
@@ -825,6 +974,111 @@ export class WhiteboardApp {
         }
     }
 
+    // --- Connector ---
+    drawConnector(ctx, el) {
+        const { sx, sy, tx, ty } = getConnectorEndpoints(el, this.elements);
+        const cam = this.camera;
+        const s1 = cam.worldToScreen(sx, sy);
+        const s2 = cam.worldToScreen(tx, ty);
+
+        ctx.strokeStyle = el.color || '#333';
+        ctx.fillStyle = el.color || '#333';
+        ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
+        ctx.lineCap = 'round';
+
+        // Draw the line
+        if (el.lineStyle === 'curved') {
+            const dx = s2.x - s1.x;
+            const cp1x = s1.x + dx * 0.4, cp1y = s1.y;
+            const cp2x = s1.x + dx * 0.6, cp2y = s2.y;
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, s2.x, s2.y);
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+        }
+
+        // Draw arrowheads
+        const headLen = 12 * cam.zoom;
+        if (el.endArrow) {
+            let angle;
+            if (el.lineStyle === 'curved') {
+                // Tangent at end of bezier
+                const dx = s2.x - s1.x;
+                const cp2x = s1.x + dx * 0.6, cp2y = s2.y;
+                angle = Math.atan2(s2.y - cp2y, s2.x - cp2x);
+            } else {
+                angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
+            }
+            ctx.beginPath();
+            ctx.moveTo(s2.x, s2.y);
+            ctx.lineTo(s2.x - headLen * Math.cos(angle - Math.PI / 6), s2.y - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(s2.x - headLen * Math.cos(angle + Math.PI / 6), s2.y - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+        if (el.startArrow) {
+            let angle;
+            if (el.lineStyle === 'curved') {
+                const dx = s2.x - s1.x;
+                const cp1x = s1.x + dx * 0.4, cp1y = s1.y;
+                angle = Math.atan2(s1.y - cp1y, s1.x - cp1x);
+            } else {
+                angle = Math.atan2(s1.y - s2.y, s1.x - s2.x);
+            }
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s1.x - headLen * Math.cos(angle - Math.PI / 6), s1.y - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(s1.x - headLen * Math.cos(angle + Math.PI / 6), s1.y - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw label at midpoint
+        if (el.label) {
+            const midX = (s1.x + s2.x) / 2;
+            const midY = (s1.y + s2.y) / 2;
+            const fontSize = 12 * cam.zoom;
+            ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const textW = ctx.measureText(el.label).width;
+            // Label background
+            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            const pad = 4 * cam.zoom;
+            ctx.beginPath();
+            ctx.roundRect(midX - textW / 2 - pad, midY - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2, 3 * cam.zoom);
+            ctx.fill();
+            // Label text
+            ctx.fillStyle = el.color || '#333';
+            ctx.fillText(el.label, midX, midY);
+            ctx.textAlign = 'left';
+        }
+    }
+
+    // --- Draw anchor points on an element ---
+    drawAnchors(ctx, el, highlightAnchor = null) {
+        const cam = this.camera;
+        const anchors = getAnchorPoints(el);
+        for (const a of anchors) {
+            const s = cam.worldToScreen(a.x, a.y);
+            const isHighlighted = highlightAnchor && highlightAnchor.name === a.name;
+            const radius = isHighlighted ? 6 : 4;
+
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = isHighlighted ? '#2196F3' : 'rgba(33,150,243,0.6)';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+    }
+
     // --- Selection ---
     drawSelection(ctx, el) {
         const cam = this.camera;
@@ -855,6 +1109,33 @@ export class WhiteboardApp {
                 ctx.beginPath();
                 ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
                 ctx.fill();
+            }
+            return;
+        }
+
+        if (el.type === 'connector') {
+            const { sx, sy, tx, ty } = getConnectorEndpoints(el, this.elements);
+            const s1 = cam.worldToScreen(sx, sy);
+            const s2 = cam.worldToScreen(tx, ty);
+            ctx.fillStyle = '#2196F3';
+            for (const s of [s1, s2]) {
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // Highlight connected elements
+            for (const id of [el.sourceId, el.targetId]) {
+                const src = this.getElementById(id);
+                if (src) {
+                    const ss = cam.worldToScreen(src.x, src.y);
+                    const sw = src.width * cam.zoom;
+                    const sh = src.height * cam.zoom;
+                    ctx.strokeStyle = 'rgba(33,150,243,0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeRect(ss.x, ss.y, sw, sh);
+                    ctx.setLineDash([]);
+                }
             }
             return;
         }
@@ -934,6 +1215,11 @@ export class WhiteboardApp {
         const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
 
         return this.elements.filter(el => {
+            if (el.type === 'connector') {
+                const { sx, sy, tx, ty } = getConnectorEndpoints(el, this.elements);
+                return (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) ||
+                       (tx >= minX && tx <= maxX && ty >= minY && ty <= maxY);
+            }
             if (el.type === 'line' || el.type === 'arrow') {
                 return (el.x >= minX && el.x <= maxX && el.y >= minY && el.y <= maxY) ||
                        (el.x2 >= minX && el.x2 <= maxX && el.y2 >= minY && el.y2 <= maxY);
