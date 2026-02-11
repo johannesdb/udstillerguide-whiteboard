@@ -25,3 +25,6 @@ rand = "0.8.5"
 yrs = "0.21.3"
 y-sync = "0.4.0"
 futures-util = "0.3.31"
+oauth2 = "4.4"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+urlencoding = "2.1"

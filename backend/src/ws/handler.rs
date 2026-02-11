@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -7,7 +8,9 @@ use axum::{
     },
     response::IntoResponse,
 };
+use chrono::{DateTime, Utc};
 use futures_util::{SinkExt, StreamExt};
+use oauth2::PkceCodeVerifier;
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -27,6 +30,8 @@ pub struct AppState {
     pub pool: PgPool,
     pub room_manager: RoomManager,
     pub jwt_secret: String,
+    pub oauth_client: Option<oauth2::basic::BasicClient>,
+    pub oauth_pending: std::sync::Mutex<HashMap<String, (PkceCodeVerifier, DateTime<Utc>)>>,
 }
 
 pub async fn ws_handler(

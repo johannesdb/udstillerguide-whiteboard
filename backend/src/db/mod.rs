@@ -92,6 +92,11 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_error_log_resolved ON error_log(resolved, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_error_log_severity ON error_log(severity, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_error_log_source ON error_log(source, created_at DESC);
+
+        -- Google OAuth: add google_id column and make password_hash nullable
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+        ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
         "#,
     )
     .execute(pool)

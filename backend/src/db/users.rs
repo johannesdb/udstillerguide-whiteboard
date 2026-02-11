@@ -7,7 +7,8 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
-    pub password_hash: String,
+    pub password_hash: Option<String>,
+    pub google_id: Option<String>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -67,5 +68,41 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>> {
         .bind(id)
         .fetch_optional(pool)
         .await?;
+    Ok(user)
+}
+
+pub async fn find_by_google_id(pool: &PgPool, google_id: &str) -> Result<Option<User>> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE google_id = $1")
+        .bind(google_id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(user)
+}
+
+pub async fn create_google_user(
+    pool: &PgPool,
+    username: &str,
+    email: &str,
+    google_id: &str,
+) -> Result<User> {
+    let user = sqlx::query_as::<_, User>(
+        "INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *",
+    )
+    .bind(username)
+    .bind(email)
+    .bind(google_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(user)
+}
+
+pub async fn link_google_account(pool: &PgPool, user_id: Uuid, google_id: &str) -> Result<User> {
+    let user = sqlx::query_as::<_, User>(
+        "UPDATE users SET google_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+    )
+    .bind(google_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
     Ok(user)
 }

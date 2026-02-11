@@ -49,6 +49,26 @@ export async function login(username, password) {
     return data;
 }
 
+export function handleGoogleCallback() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('token=')) return false;
+
+    try {
+        const params = new URLSearchParams(hash.substring(1));
+        const token = params.get('token');
+        const userStr = params.get('user');
+        if (token && userStr) {
+            const user = JSON.parse(decodeURIComponent(userStr));
+            setAuth(token, user);
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            return true;
+        }
+    } catch (e) {
+        console.error('Failed to handle Google callback:', e);
+    }
+    return false;
+}
+
 export function logout() {
     clearAuth();
     window.location.href = '/';

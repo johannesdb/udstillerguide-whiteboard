@@ -6,6 +6,9 @@ pub struct Config {
     pub jwt_secret: String,
     pub host: String,
     pub port: u16,
+    pub google_client_id: Option<String>,
+    pub google_client_secret: Option<String>,
+    pub google_redirect_uri: Option<String>,
 }
 
 impl Config {
@@ -20,7 +23,16 @@ impl Config {
                 .unwrap_or_else(|_| "3000".to_string())
                 .parse()
                 .context("PORT must be a valid number")?,
+            google_client_id: std::env::var("GOOGLE_CLIENT_ID").ok(),
+            google_client_secret: std::env::var("GOOGLE_CLIENT_SECRET").ok(),
+            google_redirect_uri: std::env::var("GOOGLE_REDIRECT_URI").ok(),
         })
+    }
+
+    pub fn google_oauth_enabled(&self) -> bool {
+        self.google_client_id.is_some()
+            && self.google_client_secret.is_some()
+            && self.google_redirect_uri.is_some()
     }
 }
 

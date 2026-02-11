@@ -118,7 +118,18 @@ pub async fn login(
         }
     };
 
-    match bcrypt::verify(&req.password, &user.password_hash) {
+    let password_hash = match &user.password_hash {
+        Some(h) => h,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "This account uses Google login. Please sign in with Google."})),
+            )
+                .into_response()
+        }
+    };
+
+    match bcrypt::verify(&req.password, password_hash) {
         Ok(true) => {
             let token = auth::create_token(user.id, &user.username, &state.jwt_secret)
                 .unwrap_or_default();
@@ -134,6 +145,15 @@ pub async fn login(
         )
             .into_response(),
     }
+}
+
+pub async fn auth_providers(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    Json(serde_json::json!({
+        "google": state.oauth_client.is_some(),
+        "password": true,
+    }))
 }
 
 pub async fn me(

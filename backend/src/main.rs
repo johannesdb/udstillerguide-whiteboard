@@ -5,6 +5,7 @@ mod db;
 mod errors;
 mod ws;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -12,6 +13,7 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
@@ -40,11 +42,36 @@ async fn main() -> anyhow::Result<()> {
     // Run migrations
     db::run_migrations(&pool).await?;
 
+    // Initialize Google OAuth client if configured
+    let oauth_client = if config.google_oauth_enabled() {
+        let client = BasicClient::new(
+            ClientId::new(config.google_client_id.clone().expect("checked")),
+            Some(ClientSecret::new(config.google_client_secret.clone().expect("checked"))),
+            AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+                .expect("valid auth URL"),
+            Some(
+                TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
+                    .expect("valid token URL"),
+            ),
+        )
+        .set_redirect_uri(
+            RedirectUrl::new(config.google_redirect_uri.clone().expect("checked"))
+                .expect("valid redirect URL"),
+        );
+        tracing::info!("Google OAuth enabled");
+        Some(client)
+    } else {
+        tracing::info!("Google OAuth not configured (GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI not set)");
+        None
+    };
+
     // Create shared state
     let state = Arc::new(AppState {
         pool,
         room_manager: RoomManager::new(),
         jwt_secret: config.jwt_secret.clone(),
+        oauth_client,
+        oauth_pending: std::sync::Mutex::new(HashMap::new()),
     });
 
     // CORS configuration
@@ -68,6 +95,12 @@ async fn main() -> anyhow::Result<()> {
     let public_routes = Router::new()
         .route("/api/auth/register", post(api::users::register))
         .route("/api/auth/login", post(api::users::login))
+        .route("/api/auth/providers", get(api::users::auth_providers))
+        .route("/api/auth/google", get(auth::google::google_login))
+        .route(
+            "/api/auth/google/callback",
+            get(auth::google::google_callback),
+        )
         .route("/api/errors", post(api::errors::report_error))
         .route(
             "/api/share/:token",

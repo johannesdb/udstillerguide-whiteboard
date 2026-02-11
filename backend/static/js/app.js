@@ -1,5 +1,5 @@
 // Main app entry point - handles routing between auth, dashboard, and board views
-import { isLoggedIn, login, register, logout, apiFetch, getUser } from '/js/auth.js?v=2';
+import { isLoggedIn, login, register, logout, apiFetch, getUser, handleGoogleCallback } from '/js/auth.js?v=3';
 import { errorHandler } from '/js/error-handler.js?v=2';
 
 class App {
@@ -9,6 +9,12 @@ class App {
     }
 
     route() {
+        // Handle Google OAuth callback (token in URL fragment)
+        if (handleGoogleCallback()) {
+            this.showDashboard();
+            return;
+        }
+
         const params = new URLSearchParams(window.location.search);
         const shareToken = params.get('share');
 
@@ -31,13 +37,27 @@ class App {
         this.appEl.style.overflow = 'auto';
         document.body.style.overflow = 'auto';
 
+        // Check for OAuth error in query params
+        const params = new URLSearchParams(window.location.search);
+        const oauthError = params.get('error');
+        if (oauthError) {
+            history.replaceState(null, '', window.location.pathname);
+        }
+
         const container = document.createElement('div');
         container.className = 'auth-container';
         container.innerHTML = `
             <div class="auth-box">
                 <h1>Udstillerguide Whiteboard</h1>
                 <p id="auth-subtitle">Sign in to your account</p>
-                <div class="auth-error" id="auth-error"></div>
+                <div class="auth-error" id="auth-error">${oauthError ? 'Google login failed. Please try again.' : ''}</div>
+                <div id="google-auth-section" style="display:none">
+                    <button class="btn-google" id="btn-google-login">
+                        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                        Sign in with Google
+                    </button>
+                    <div class="auth-divider"><span>or</span></div>
+                </div>
                 <form id="auth-form">
                     <div class="form-group" id="username-group">
                         <label for="username">Username</label>
@@ -60,13 +80,32 @@ class App {
         `;
         this.appEl.appendChild(container);
 
+        // Show error if OAuth failed
+        const errorEl = document.getElementById('auth-error');
+        if (oauthError) {
+            errorEl.style.display = 'block';
+        }
+
+        // Fetch auth providers and show Google button if enabled
+        fetch('/api/auth/providers')
+            .then(r => r.json())
+            .then(providers => {
+                if (providers.google) {
+                    document.getElementById('google-auth-section').style.display = 'block';
+                }
+            })
+            .catch(() => {});
+
+        document.getElementById('btn-google-login').addEventListener('click', () => {
+            window.location.href = '/api/auth/google';
+        });
+
         let isLogin = true;
         const form = document.getElementById('auth-form');
         const toggle = document.getElementById('toggle-auth');
         const emailGroup = document.getElementById('email-group');
         const subtitle = document.getElementById('auth-subtitle');
         const submitBtn = document.getElementById('auth-submit');
-        const errorEl = document.getElementById('auth-error');
 
         toggle.addEventListener('click', (e) => {
             e.preventDefault();
