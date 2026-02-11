@@ -24,10 +24,12 @@ export function generateId() {
 
 // === Camera ===
 export class Camera {
-    constructor() {
+    constructor(boardId) {
         this.x = 0;
         this.y = 0;
         this.zoom = 1;
+        this._boardId = boardId;
+        this._saveTimer = null;
     }
 
     worldToScreen(wx, wy) {
@@ -51,11 +53,41 @@ export class Camera {
         const worldAfter = this.screenToWorld(sx, sy);
         this.x += worldBefore.x - worldAfter.x;
         this.y += worldBefore.y - worldAfter.y;
+        this._scheduleSave();
     }
 
     pan(dx, dy) {
         this.x -= dx / this.zoom;
         this.y -= dy / this.zoom;
+        this._scheduleSave();
+    }
+
+    _scheduleSave() {
+        if (!this._boardId) return;
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => {
+            try {
+                localStorage.setItem(`viewport_${this._boardId}`, JSON.stringify({
+                    x: this.x, y: this.y, zoom: this.zoom,
+                }));
+            } catch (_) { /* localStorage full or unavailable */ }
+        }, 300);
+    }
+
+    restore() {
+        if (!this._boardId) return false;
+        try {
+            const saved = localStorage.getItem(`viewport_${this._boardId}`);
+            if (!saved) return false;
+            const { x, y, zoom } = JSON.parse(saved);
+            if (typeof x === 'number' && typeof y === 'number' && typeof zoom === 'number') {
+                this.x = x;
+                this.y = y;
+                this.zoom = Math.max(0.1, Math.min(5, zoom));
+                return true;
+            }
+        } catch (_) { /* corrupt data */ }
+        return false;
     }
 }
 
@@ -435,7 +467,8 @@ export class WhiteboardApp {
     constructor(canvasId, options = {}) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-        this.camera = new Camera();
+        this.camera = new Camera(options.boardId);
+        this.camera.restore();
         this.elements = [];
         this.selectedIds = new Set();
         this.boardId = options.boardId;
@@ -468,6 +501,7 @@ export class WhiteboardApp {
 
         // Tool manager
         this.toolManager = new ToolManager(this);
+        this.toolManager.updateZoomDisplay();
 
         // UI manager
         this.uiManager = new UIManager(this);
