@@ -1,15 +1,24 @@
 // Canvas rendering engine - the core of the whiteboard
 // Implements: camera, world coordinates, render loop, hit testing, element management
 
-import { ToolManager } from '/js/tools.js';
-import { UIManager } from '/js/ui.js';
-import { SyncManager } from '/js/sync.js';
-import { getToken } from '/js/auth.js';
+import { ToolManager } from '/js/tools.js?v=2';
+import { UIManager } from '/js/ui.js?v=2';
+import { SyncManager } from '/js/sync.js?v=2';
+import { getToken } from '/js/auth.js?v=2';
+import { WhiteboardPlugins } from '/js/plugins.js?v=2';
 
-// Generate unique IDs
+const imageCache = new Map();
+function loadImage(src) {
+    if (imageCache.has(src)) return imageCache.get(src);
+    const img = new Image();
+    img.src = src;
+    imageCache.set(src, img);
+    return img;
+}
+
 let idCounter = 0;
 export function generateId() {
-    return `el_${Date.now()}_${idCounter++}_${Math.random().toString(36).substr(2, 6)}`;
+    return `el_${Date.now()}_${idCounter++}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
 // === Camera ===
@@ -59,52 +68,37 @@ export function createStickyNote(x, y, color = '#FFF176') {
     };
 }
 
-export function createRect(x, y, w, h, color = '#333333', fill = 'transparent') {
+function createShape(type, x, y, w, h, color = '#333333', fill = 'transparent', extra = {}) {
     return {
-        id: generateId(), type: 'rect',
+        id: generateId(), type,
         x, y, width: w, height: h,
         color, fill, strokeWidth: 2, rotation: 0,
+        ...extra,
     };
+}
+
+export function createRect(x, y, w, h, color = '#333333', fill = 'transparent') {
+    return createShape('rect', x, y, w, h, color, fill);
 }
 
 export function createCircle(x, y, rx, ry, color = '#333333', fill = 'transparent') {
-    return {
-        id: generateId(), type: 'circle',
-        x, y, width: rx * 2, height: ry * 2,
-        color, fill, strokeWidth: 2, rotation: 0,
-    };
+    return createShape('circle', x, y, rx * 2, ry * 2, color, fill);
 }
 
 export function createTriangle(x, y, w, h, color = '#333333', fill = 'transparent') {
-    return {
-        id: generateId(), type: 'triangle',
-        x, y, width: w, height: h,
-        color, fill, strokeWidth: 2, rotation: 0,
-    };
+    return createShape('triangle', x, y, w, h, color, fill);
 }
 
 export function createDiamond(x, y, w, h, color = '#333333', fill = 'transparent') {
-    return {
-        id: generateId(), type: 'diamond',
-        x, y, width: w, height: h,
-        color, fill, strokeWidth: 2, rotation: 0,
-    };
+    return createShape('diamond', x, y, w, h, color, fill);
 }
 
 export function createStar(x, y, w, h, color = '#333333', fill = 'transparent') {
-    return {
-        id: generateId(), type: 'star',
-        x, y, width: w, height: h,
-        color, fill, strokeWidth: 2, rotation: 0, points: 5,
-    };
+    return createShape('star', x, y, w, h, color, fill, { points: 5 });
 }
 
 export function createHexagon(x, y, w, h, color = '#333333', fill = 'transparent') {
-    return {
-        id: generateId(), type: 'hexagon',
-        x, y, width: w, height: h,
-        color, fill, strokeWidth: 2, rotation: 0,
-    };
+    return createShape('hexagon', x, y, w, h, color, fill);
 }
 
 export function createLine(x1, y1, x2, y2, color = '#333333', strokeWidth = 2) {
@@ -146,6 +140,69 @@ export function createTextBox(x, y, w, h, color = '#333333', fill = '#FFFFFF') {
         fontSize: 14, strokeWidth: 1, rotation: 0,
         borderColor: '#cccccc',
     };
+}
+
+export function createImage(x, y, width, height, src) {
+    return { id: generateId(), type: 'image', x, y, width, height, src, rotation: 0 };
+}
+
+// === Connector ===
+
+export function createConnector(sourceId, targetId, sourceAnchor = 'auto', targetAnchor = 'auto', color = '#333333', strokeWidth = 2) {
+    return {
+        id: generateId(), type: 'connector',
+        sourceId, targetId,
+        sourceAnchor, targetAnchor,
+        sourceMarker: 'none',
+        targetMarker: 'arrow',
+        lineStyle: 'solid',
+        label: '',
+        color, strokeWidth,
+        x: 0, y: 0, x2: 0, y2: 0,
+    };
+}
+
+// === Anchor Points ===
+
+export function getAnchorPoints(el) {
+    if (!el || el.type === 'line' || el.type === 'arrow' || el.type === 'drawing' || el.type === 'connector') return [];
+    const w = el.width || 0;
+    const h = el.height || 0;
+    return [
+        { name: 'top', x: el.x + w / 2, y: el.y },
+        { name: 'right', x: el.x + w, y: el.y + h / 2 },
+        { name: 'bottom', x: el.x + w / 2, y: el.y + h },
+        { name: 'left', x: el.x, y: el.y + h / 2 },
+    ];
+}
+
+export function getAnchorPoint(el, anchorName, otherX, otherY) {
+    const anchors = getAnchorPoints(el);
+    if (anchors.length === 0) return { x: el.x, y: el.y };
+    if (anchorName !== 'auto') {
+        return anchors.find(a => a.name === anchorName) || anchors[0];
+    }
+    let best = anchors[0], bestDist = Infinity;
+    for (const a of anchors) {
+        const d = Math.hypot(a.x - otherX, a.y - otherY);
+        if (d < bestDist) { bestDist = d; best = a; }
+    }
+    return best;
+}
+
+export function resolveConnectorEndpoints(connector, elements) {
+    const source = elements.find(e => e.id === connector.sourceId);
+    const target = elements.find(e => e.id === connector.targetId);
+    if (!source || !target) {
+        return { sx: connector.x, sy: connector.y, ex: connector.x2, ey: connector.y2 };
+    }
+    const sCx = source.x + (source.width || 0) / 2;
+    const sCy = source.y + (source.height || 0) / 2;
+    const tCx = target.x + (target.width || 0) / 2;
+    const tCy = target.y + (target.height || 0) / 2;
+    const sp = getAnchorPoint(source, connector.sourceAnchor, tCx, tCy);
+    const tp = getAnchorPoint(target, connector.targetAnchor, sCx, sCy);
+    return { sx: sp.x, sy: sp.y, ex: tp.x, ey: tp.y };
 }
 
 // === Hit Testing ===
@@ -250,43 +307,109 @@ function getStarVertices(el) {
     return verts;
 }
 
-export function hitTest(px, py, el, zoom = 1) {
-    const threshold = 8 / zoom;
-    switch (el.type) {
-        case 'sticky':
-        case 'rect':
-        case 'textbox':
-            return pointInRect(px, py, el);
-        case 'circle':
-            return pointInCircle(px, py, el);
-        case 'triangle':
-            return pointInPolygon(px, py, getTriangleVertices(el));
-        case 'diamond':
-            return pointInPolygon(px, py, getDiamondVertices(el));
-        case 'hexagon':
-            return pointInPolygon(px, py, getHexagonVertices(el));
-        case 'star':
-            return pointInPolygon(px, py, getStarVertices(el));
-        case 'line':
-        case 'arrow':
-            return pointNearLine(px, py, el.x, el.y, el.x2, el.y2, threshold);
-        case 'drawing':
-            return pointNearDrawing(px, py, el, threshold);
-        case 'text':
+// === Register Built-in Element Types ===
+
+function registerBuiltinTypes(app) {
+    WhiteboardPlugins.registerElementType('sticky', {
+        draw(ctx, el) { app.drawSticky(ctx, el); },
+        hitTest(px, py, el) { return pointInRect(px, py, el); },
+    });
+    WhiteboardPlugins.registerElementType('rect', {
+        draw(ctx, el) { app.drawRect(ctx, el); },
+        hitTest(px, py, el) { return pointInRect(px, py, el); },
+    });
+    WhiteboardPlugins.registerElementType('textbox', {
+        draw(ctx, el) { app.drawTextBox(ctx, el); },
+        hitTest(px, py, el) { return pointInRect(px, py, el); },
+    });
+    WhiteboardPlugins.registerElementType('circle', {
+        draw(ctx, el) { app.drawCircleEl(ctx, el); },
+        hitTest(px, py, el) { return pointInCircle(px, py, el); },
+    });
+    WhiteboardPlugins.registerElementType('triangle', {
+        draw(ctx, el) { app.drawTriangle(ctx, el); },
+        hitTest(px, py, el) { return pointInPolygon(px, py, getTriangleVertices(el)); },
+    });
+    WhiteboardPlugins.registerElementType('diamond', {
+        draw(ctx, el) { app.drawDiamond(ctx, el); },
+        hitTest(px, py, el) { return pointInPolygon(px, py, getDiamondVertices(el)); },
+    });
+    WhiteboardPlugins.registerElementType('hexagon', {
+        draw(ctx, el) { app.drawHexagon(ctx, el); },
+        hitTest(px, py, el) { return pointInPolygon(px, py, getHexagonVertices(el)); },
+    });
+    WhiteboardPlugins.registerElementType('star', {
+        draw(ctx, el) { app.drawStar(ctx, el); },
+        hitTest(px, py, el) { return pointInPolygon(px, py, getStarVertices(el)); },
+    });
+    WhiteboardPlugins.registerElementType('line', {
+        draw(ctx, el) { app.drawLine(ctx, el); },
+        hitTest(px, py, el, zoom) { return pointNearLine(px, py, el.x, el.y, el.x2, el.y2, 8 / zoom); },
+    });
+    WhiteboardPlugins.registerElementType('arrow', {
+        draw(ctx, el) { app.drawArrow(ctx, el); },
+        hitTest(px, py, el, zoom) { return pointNearLine(px, py, el.x, el.y, el.x2, el.y2, 8 / zoom); },
+    });
+    WhiteboardPlugins.registerElementType('drawing', {
+        draw(ctx, el) { app.drawDrawing(ctx, el); },
+        hitTest(px, py, el, zoom) { return pointNearDrawing(px, py, el, 8 / zoom); },
+    });
+    WhiteboardPlugins.registerElementType('text', {
+        draw(ctx, el) { app.drawText(ctx, el); },
+        hitTest(px, py, el) {
             return pointInRect(px, py, {
                 x: el.x, y: el.y,
                 width: el.width || el.content.length * el.fontSize * 0.6,
                 height: el.height || el.fontSize * 1.4,
             });
-        default:
-            return false;
+        },
+    });
+    WhiteboardPlugins.registerElementType('connector', {
+        draw(ctx, el) { app.drawConnector(ctx, el); },
+        hitTest(px, py, el, zoom) { return pointNearLine(px, py, el.x, el.y, el.x2, el.y2, 8 / zoom); },
+    });
+    WhiteboardPlugins.registerElementType('image', {
+        draw(ctx, el) {
+            const img = loadImage(el.src);
+            const cam = app.camera;
+            const s = cam.worldToScreen(el.x, el.y);
+            const sw = el.width * cam.zoom;
+            const sh = el.height * cam.zoom;
+            if (!img.complete || !img.naturalWidth) {
+                // Draw placeholder while loading
+                ctx.strokeStyle = '#ccc';
+                ctx.strokeRect(s.x, s.y, sw, sh);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(s.x, s.y, sw, sh);
+                ctx.fillStyle = '#999';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Loading...', s.x + sw / 2, s.y + sh / 2);
+                ctx.textAlign = 'start';
+                ctx.textBaseline = 'alphabetic';
+                img.onload = () => app.render();
+                return;
+            }
+            ctx.drawImage(img, s.x, s.y, sw, sh);
+        },
+        hitTest(px, py, el) { return pointInRect(px, py, el); },
+    });
+}
+
+export function hitTest(px, py, el, zoom = 1) {
+    const threshold = 8 / zoom;
+    const typeDef = WhiteboardPlugins.getElementType(el.type);
+    if (typeDef && typeDef.hitTest) {
+        return typeDef.hitTest(px, py, el, zoom);
     }
+    return false;
 }
 
 // === Resize Handle Hit Test ===
 
 export function hitTestResizeHandle(px, py, el, zoom = 1) {
-    if (el.type === 'line' || el.type === 'arrow' || el.type === 'drawing') return null;
+    if (el.type === 'line' || el.type === 'arrow' || el.type === 'drawing' || el.type === 'connector') return null;
     const handleSize = 8 / zoom;
     const handles = getResizeHandles(el);
     for (const [name, hx, hy] of handles) {
@@ -338,6 +461,9 @@ export class WhiteboardApp {
         // Setup
         this.resize();
         this.setupEventListeners();
+
+        // Register built-in element types with plugin registry
+        registerBuiltinTypes(this);
 
         // Tool manager
         this.toolManager = new ToolManager(this);
@@ -403,30 +529,87 @@ export class WhiteboardApp {
             // Tool shortcuts
             const shortcuts = {
                 'v': 'select', 'h': 'pan', 's': 'sticky', 'r': 'rect',
-                'c': 'circle', 'l': 'line', 'a': 'arrow', 'd': 'draw', 't': 'text',
+                'c': 'circle', 'l': 'line', 'a': 'arrow', 'k': 'connector', 'd': 'draw', 't': 'text',
             };
             if (shortcuts[e.key] && !e.ctrlKey && !e.metaKey) {
                 this.toolManager.setTool(shortcuts[e.key]);
             }
+        });
+
+        // Image drag-and-drop
+        this.canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        this.canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+            if (!files.length) return;
+            const world = this.camera.screenToWorld(e.offsetX, e.offsetY);
+            for (const file of files) {
+                this.uploadImage(file, world.x, world.y);
+            }
+        });
+
+        // Image paste
+        document.addEventListener('paste', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            const items = [...(e.clipboardData?.items || [])];
+            const imageItem = items.find(i => i.type.startsWith('image/'));
+            if (!imageItem) return;
+            e.preventDefault();
+            const file = imageItem.getAsFile();
+            if (!file) return;
+            const world = this.camera.screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+            this.uploadImage(file, world.x, world.y);
         });
     }
 
     // === Element Management ===
     addElement(el) {
         this.elements.push(el);
+        WhiteboardPlugins.fireHook('onElementCreate', el);
         this.syncManager.addElement(el);
         this.saveHistory();
+    }
+
+    async uploadImage(file, worldX, worldY) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { apiFetch } = await import('/js/auth.js?v=2');
+        const res = await apiFetch(`/api/boards/${this.boardId}/images`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!res.ok) { console.error('Image upload failed'); return; }
+        const data = await res.json();
+        const img = new Image();
+        img.src = data.url;
+        img.onload = () => {
+            let w = img.naturalWidth;
+            let h = img.naturalHeight;
+            const maxSize = 400;
+            if (w > maxSize || h > maxSize) {
+                const scale = maxSize / Math.max(w, h);
+                w *= scale;
+                h *= scale;
+            }
+            const el = createImage(worldX - w / 2, worldY - h / 2, w, h, data.url);
+            this.addElement(el);
+        };
     }
 
     updateElement(id, props) {
         const el = this.elements.find(e => e.id === id);
         if (el) {
             Object.assign(el, props);
+            WhiteboardPlugins.fireHook('onElementUpdate', id, props);
             this.syncManager.updateElement(el);
         }
     }
 
     removeElement(id) {
+        WhiteboardPlugins.fireHook('onElementDelete', id);
         this.elements = this.elements.filter(e => e.id !== id);
         this.syncManager.removeElement(id);
         this.selectedIds.delete(id);
@@ -439,10 +622,19 @@ export class WhiteboardApp {
 
     deleteSelected() {
         if (this.selectedIds.size === 0) return;
-        for (const id of this.selectedIds) {
-            this.elements = this.elements.filter(e => e.id !== id);
+        const deletedIds = new Set(this.selectedIds);
+
+        // Also remove connectors that reference deleted elements
+        for (const el of this.elements) {
+            if (el.type === 'connector' && (deletedIds.has(el.sourceId) || deletedIds.has(el.targetId))) {
+                deletedIds.add(el.id);
+            }
+        }
+
+        for (const id of deletedIds) {
             this.syncManager.removeElement(id);
         }
+        this.elements = this.elements.filter(e => !deletedIds.has(e.id));
         this.selectedIds.clear();
         this.saveHistory();
     }
@@ -550,7 +742,7 @@ export class WhiteboardApp {
                    s2.y >= -margin && s1.y <= screenH + margin;
         }
 
-        if (el.type === 'line' || el.type === 'arrow') {
+        if (el.type === 'line' || el.type === 'arrow' || el.type === 'connector') {
             const s1 = cam.worldToScreen(el.x, el.y);
             const s2 = cam.worldToScreen(el.x2, el.y2);
             return Math.max(s1.x, s2.x) >= -margin && Math.min(s1.x, s2.x) <= screenW + margin &&
@@ -565,19 +757,9 @@ export class WhiteboardApp {
     }
 
     drawElement(ctx, el) {
-        switch (el.type) {
-            case 'sticky': this.drawSticky(ctx, el); break;
-            case 'rect': this.drawRect(ctx, el); break;
-            case 'circle': this.drawCircleEl(ctx, el); break;
-            case 'triangle': this.drawTriangle(ctx, el); break;
-            case 'diamond': this.drawDiamond(ctx, el); break;
-            case 'star': this.drawStar(ctx, el); break;
-            case 'hexagon': this.drawHexagon(ctx, el); break;
-            case 'line': this.drawLine(ctx, el); break;
-            case 'arrow': this.drawArrow(ctx, el); break;
-            case 'drawing': this.drawDrawing(ctx, el); break;
-            case 'text': this.drawText(ctx, el); break;
-            case 'textbox': this.drawTextBox(ctx, el); break;
+        const typeDef = WhiteboardPlugins.getElementType(el.type);
+        if (typeDef && typeDef.draw) {
+            typeDef.draw(ctx, el);
         }
     }
 
@@ -751,6 +933,157 @@ export class WhiteboardApp {
         ctx.fill();
     }
 
+    // --- Connector ---
+    drawConnector(ctx, el) {
+        const pts = resolveConnectorEndpoints(el, this.elements);
+        el.x = pts.sx; el.y = pts.sy; el.x2 = pts.ex; el.y2 = pts.ey;
+
+        const cam = this.camera;
+        const s1 = cam.worldToScreen(pts.sx, pts.sy);
+        const s2 = cam.worldToScreen(pts.ex, pts.ey);
+
+        ctx.strokeStyle = el.color || '#333';
+        ctx.fillStyle = el.color || '#333';
+        ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
+        ctx.lineCap = 'round';
+
+        // Line style
+        if (el.lineStyle === 'dashed') ctx.setLineDash([8 * cam.zoom, 4 * cam.zoom]);
+        else if (el.lineStyle === 'dotted') ctx.setLineDash([2 * cam.zoom, 4 * cam.zoom]);
+        else ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.moveTo(s1.x, s1.y);
+        ctx.lineTo(s2.x, s2.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Markers
+        const headSize = 12 * cam.zoom;
+        if (el.sourceMarker && el.sourceMarker !== 'none') {
+            const angle = Math.atan2(s1.y - s2.y, s1.x - s2.x);
+            this.drawEndpointMarker(ctx, s1.x, s1.y, angle, el.sourceMarker, headSize, el.color || '#333', el.strokeWidth * cam.zoom);
+        }
+        if (el.targetMarker && el.targetMarker !== 'none') {
+            const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
+            this.drawEndpointMarker(ctx, s2.x, s2.y, angle, el.targetMarker, headSize, el.color || '#333', el.strokeWidth * cam.zoom);
+        }
+
+        // Label
+        if (el.label) {
+            const mx = (s1.x + s2.x) / 2;
+            const my = (s1.y + s2.y) / 2;
+            const fontSize = 12 * cam.zoom;
+            ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            const textW = ctx.measureText(el.label).width;
+            const pad = 4 * cam.zoom;
+
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.beginPath();
+            ctx.roundRect(mx - textW / 2 - pad, my - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2, 3 * cam.zoom);
+            ctx.fill();
+
+            ctx.fillStyle = el.color || '#333';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(el.label, mx, my);
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
+        }
+    }
+
+    drawEndpointMarker(ctx, x, y, angle, type, size, color, lineWidth) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        switch (type) {
+            case 'arrow':
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-size, -size * 0.4);
+                ctx.lineTo(-size, size * 0.4);
+                ctx.closePath();
+                ctx.fill();
+                break;
+            case 'open-arrow':
+                ctx.beginPath();
+                ctx.moveTo(-size, -size * 0.4);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(-size, size * 0.4);
+                ctx.stroke();
+                break;
+            case 'one':
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.15, -size * 0.45);
+                ctx.lineTo(-size * 0.15, size * 0.45);
+                ctx.stroke();
+                break;
+            case 'many': {
+                // Crow's foot: three prongs
+                const forkX = -size * 0.7;
+                ctx.beginPath();
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, 0);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, -size * 0.45);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, size * 0.45);
+                ctx.stroke();
+                break;
+            }
+            case 'one-many': {
+                // | + crow's foot
+                ctx.beginPath();
+                ctx.moveTo(-size, -size * 0.45);
+                ctx.lineTo(-size, size * 0.45);
+                ctx.stroke();
+                const forkX = -size * 0.6;
+                ctx.beginPath();
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, 0);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, -size * 0.45);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, size * 0.45);
+                ctx.stroke();
+                break;
+            }
+            case 'zero-many': {
+                // ○ + crow's foot
+                const r = size * 0.18;
+                ctx.beginPath();
+                ctx.arc(-size * 0.88, 0, r, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = color;
+                const forkX = -size * 0.55;
+                ctx.beginPath();
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, 0);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, -size * 0.45);
+                ctx.moveTo(forkX, 0); ctx.lineTo(0, size * 0.45);
+                ctx.stroke();
+                break;
+            }
+            case 'zero-one': {
+                // ○ + |
+                const r = size * 0.18;
+                ctx.beginPath();
+                ctx.arc(-size * 0.7, 0, r, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.3, -size * 0.45);
+                ctx.lineTo(-size * 0.3, size * 0.45);
+                ctx.stroke();
+                break;
+            }
+        }
+        ctx.restore();
+    }
+
     // --- Freehand Drawing ---
     drawDrawing(ctx, el) {
         if (!el.points || el.points.length < 2) return;
@@ -847,9 +1180,20 @@ export class WhiteboardApp {
             return;
         }
 
-        if (el.type === 'line' || el.type === 'arrow') {
+        if (el.type === 'line' || el.type === 'arrow' || el.type === 'connector') {
             const s1 = cam.worldToScreen(el.x, el.y);
             const s2 = cam.worldToScreen(el.x2, el.y2);
+            // Dashed line for connector selection
+            if (el.type === 'connector') {
+                ctx.strokeStyle = '#2196F3';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(s1.x, s1.y);
+                ctx.lineTo(s2.x, s2.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
             ctx.fillStyle = '#2196F3';
             for (const s of [s1, s2]) {
                 ctx.beginPath();
@@ -934,7 +1278,7 @@ export class WhiteboardApp {
         const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
 
         return this.elements.filter(el => {
-            if (el.type === 'line' || el.type === 'arrow') {
+            if (el.type === 'line' || el.type === 'arrow' || el.type === 'connector') {
                 return (el.x >= minX && el.x <= maxX && el.y >= minY && el.y <= maxY) ||
                        (el.x2 >= minX && el.x2 <= maxX && el.y2 >= minY && el.y2 <= maxY);
             }

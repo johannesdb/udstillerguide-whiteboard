@@ -85,11 +85,7 @@ export class SyncManager {
 
     send(data) {
         if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-            if (typeof data === 'string') {
-                this.ws.send(data);
-            } else {
-                this.ws.send(data);
-            }
+            this.ws.send(data);
         } else {
             this.pendingUpdates.push(data);
         }
@@ -136,8 +132,8 @@ export class SyncManager {
                     this.handleLeave(msg);
                     break;
             }
-        } catch (e) {
-            // Ignore parse errors for binary messages
+        } catch {
+            // Binary Yjs messages that aren't JSON are expected; ignore parse errors
         }
     }
 

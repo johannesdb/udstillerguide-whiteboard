@@ -8,12 +8,8 @@ import {
 } from '/js/canvas.js?v=2';
 import { WhiteboardPlugins } from '/js/plugins.js?v=2';
 
-// All shape-type tools that use drag-to-create
 const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
 const LINE_TOOLS = new Set(['line', 'arrow']);
-
-// Marker types for ER diagrams and general use
-const MARKER_TYPES = ['none', 'arrow', 'open-arrow', 'one', 'many', 'one-many', 'zero-many', 'zero-one'];
 
 export class ToolManager {
     constructor(app) {
@@ -95,26 +91,28 @@ export class ToolManager {
     }
 
     setupToolbarEvents() {
+        const pickerIds = {
+            'color': 'color-picker',
+            'fill-color': 'fill-picker',
+            'stroke-width': 'stroke-picker',
+        };
+        const allPickerIds = Object.values(pickerIds);
+
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tool = btn.dataset.tool;
                 if (!tool) return;
-                if (tool === 'color') {
-                    document.getElementById('color-picker')?.classList.toggle('visible');
-                    document.getElementById('stroke-picker')?.classList.remove('visible');
-                    document.getElementById('fill-picker')?.classList.remove('visible');
-                    return;
-                }
-                if (tool === 'stroke-width') {
-                    document.getElementById('stroke-picker')?.classList.toggle('visible');
-                    document.getElementById('color-picker')?.classList.remove('visible');
-                    document.getElementById('fill-picker')?.classList.remove('visible');
-                    return;
-                }
-                if (tool === 'fill-color') {
-                    document.getElementById('fill-picker')?.classList.toggle('visible');
-                    document.getElementById('color-picker')?.classList.remove('visible');
-                    document.getElementById('stroke-picker')?.classList.remove('visible');
+                if (pickerIds[tool]) {
+                    const targetId = pickerIds[tool];
+                    for (const id of allPickerIds) {
+                        const el = document.getElementById(id);
+                        if (!el) continue;
+                        if (id === targetId) {
+                            el.classList.toggle('visible');
+                        } else {
+                            el.classList.remove('visible');
+                        }
+                    }
                     return;
                 }
                 this.setTool(tool);
@@ -138,12 +136,8 @@ export class ToolManager {
                 for (const id of this.app.selectedIds) {
                     const el = this.app.getElementById(id);
                     if (el) {
-                        if (el.type === 'sticky') {
-                            this.app.updateElement(id, { color });
-                            this.app.stickyColor = color;
-                        } else {
-                            this.app.updateElement(id, { color });
-                        }
+                        this.app.updateElement(id, { color });
+                        if (el.type === 'sticky') this.app.stickyColor = color;
                     }
                 }
                 document.getElementById('color-picker')?.classList.remove('visible');
@@ -295,7 +289,7 @@ export class ToolManager {
     onMouseUp(e) {
         if (this.isPanning) {
             this.isPanning = false;
-            this.app.canvas.style.cursor = this.spaceDown ? 'grab' : (this.currentTool === 'pan' ? 'grab' : 'default');
+            this.app.canvas.style.cursor = (this.spaceDown || this.currentTool === 'pan') ? 'grab' : 'default';
             return;
         }
 

@@ -1,5 +1,5 @@
 // Main app entry point - handles routing between auth, dashboard, and board views
-import { isLoggedIn, login, register, logout, apiFetch, getUser } from '/js/auth.js';
+import { isLoggedIn, login, register, logout, apiFetch, getUser } from '/js/auth.js?v=2';
 
 class App {
     constructor() {
@@ -144,10 +144,12 @@ class App {
             }
 
             grid.innerHTML = '';
+            const user = getUser();
             for (const board of boards) {
                 const card = document.createElement('div');
                 card.className = 'board-card';
                 const date = new Date(board.created_at).toLocaleDateString();
+                const isOwner = user && board.owner_id === user.id;
                 card.innerHTML = `
                     <div class="board-card-preview">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
@@ -159,8 +161,8 @@ class App {
                         <div class="board-card-name">${this.escapeHtml(board.name)}</div>
                         <div class="board-card-date">Created ${date}</div>
                         <div class="board-card-actions">
-                            <button class="rename" data-id="${board.id}">Rename</button>
-                            <button class="delete" data-id="${board.id}">Delete</button>
+                            ${isOwner ? `<button class="rename" data-id="${board.id}">Rename</button>` : ''}
+                            ${isOwner ? `<button class="delete" data-id="${board.id}">Delete</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -170,8 +172,10 @@ class App {
                     window.location.href = `/board.html?id=${board.id}`;
                 });
 
-                card.querySelector('.rename').addEventListener('click', () => this.renameBoard(board.id, board.name));
-                card.querySelector('.delete').addEventListener('click', () => this.deleteBoard(board.id, board.name));
+                if (isOwner) {
+                    card.querySelector('.rename').addEventListener('click', () => this.renameBoard(board.id, board.name));
+                    card.querySelector('.delete').addEventListener('click', () => this.deleteBoard(board.id, board.name));
+                }
 
                 grid.appendChild(card);
             }
@@ -203,10 +207,14 @@ class App {
         if (!name || name === currentName) return;
 
         try {
-            await apiFetch(`/api/boards/${id}`, {
+            const res = await apiFetch(`/api/boards/${id}`, {
                 method: 'PUT',
                 body: { name },
             });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Rename failed');
+            }
             await this.loadBoards();
         } catch (err) {
             alert('Failed to rename board: ' + err.message);
@@ -217,7 +225,11 @@ class App {
         if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
 
         try {
-            await apiFetch(`/api/boards/${id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/boards/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Delete failed');
+            }
             await this.loadBoards();
         } catch (err) {
             alert('Failed to delete board: ' + err.message);

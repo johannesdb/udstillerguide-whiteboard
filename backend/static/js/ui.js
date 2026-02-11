@@ -1,5 +1,6 @@
 // UI Manager - handles UI overlays, modals, and board-level interactions
-import { apiFetch, getToken, getUser } from '/js/auth.js';
+import { apiFetch, getToken, getUser } from '/js/auth.js?v=2';
+import { WhiteboardPlugins } from '/js/plugins.js?v=2';
 
 export class UIManager {
     constructor(app) {
@@ -7,6 +8,73 @@ export class UIManager {
         this.setupBackButton();
         this.setupShareButton();
         this.loadBoardInfo();
+        this.setupPluginPanels();
+    }
+
+    setupPluginPanels() {
+        const panels = WhiteboardPlugins.panels;
+        if (!panels || panels.length === 0) return;
+
+        const tabsContainer = document.getElementById('plugin-sidebar-tabs');
+        if (!tabsContainer) return;
+
+        // Create tabs for each panel
+        for (const panel of panels) {
+            const tab = document.createElement('button');
+            tab.className = 'sidebar-tab';
+            tab.dataset.panelId = panel.id;
+            tab.textContent = panel.title || panel.id;
+            tab.addEventListener('click', () => this.activatePanel(panel.id));
+            tabsContainer.appendChild(tab);
+        }
+
+        // Close button handler
+        document.getElementById('plugin-sidebar-close')?.addEventListener('click', () => this.toggleSidebar());
+
+        // Add sidebar toggle button to top-bar
+        const topBar = document.getElementById('top-bar');
+        if (topBar) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'top-btn';
+            toggleBtn.id = 'btn-sidebar-toggle';
+            toggleBtn.title = 'Toggle Sidebar';
+            toggleBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="15" y1="3" x2="15" y2="21"/>
+        </svg>`;
+            toggleBtn.addEventListener('click', () => this.toggleSidebar());
+            topBar.appendChild(toggleBtn);
+        }
+    }
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('plugin-sidebar');
+        if (sidebar) {
+            sidebar.classList.toggle('visible');
+        }
+    }
+
+    activatePanel(panelId) {
+        // Update tab active states
+        document.querySelectorAll('.sidebar-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.panelId === panelId);
+        });
+
+        // Clear and render panel content
+        const content = document.getElementById('plugin-sidebar-content');
+        if (!content) return;
+        content.innerHTML = '';
+
+        const panel = WhiteboardPlugins.panels.find(p => p.id === panelId);
+        if (panel && panel.render) {
+            panel.render(content);
+        }
+
+        // Ensure sidebar is visible
+        const sidebar = document.getElementById('plugin-sidebar');
+        if (sidebar && !sidebar.classList.contains('visible')) {
+            sidebar.classList.add('visible');
+        }
     }
 
     setupBackButton() {
