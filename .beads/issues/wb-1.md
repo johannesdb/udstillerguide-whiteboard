@@ -2,7 +2,7 @@
 id: wb-1
 title: "Fase 1: Plugin Registry"
 type: feature
-status: open
+status: closed
 priority: 1
 created: 2026-02-11
 ---
@@ -13,11 +13,11 @@ Tilfoej et generisk plugin-system til whiteboard frontend.
 
 ## Opgaver
 
-- [ ] `WhiteboardPlugins` klasse med `register()` metode
-- [ ] Hook ind i canvas render-loop for custom element-typer
-- [ ] Hook ind i tool manager for custom tools
-- [ ] Sidebar-panel system for plugin-UI
-- [ ] Element lifecycle hooks (create, update, delete)
+- [x] `WhiteboardPlugins` klasse med `register()` metode
+- [x] Hook ind i canvas render-loop for custom element-typer
+- [x] Hook ind i tool manager for custom tools
+- [x] Sidebar-panel system for plugin-UI
+- [x] Element lifecycle hooks (create, update, delete)
 
 ## Filer
 
