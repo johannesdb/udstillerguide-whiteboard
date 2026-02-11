@@ -1,4 +1,5 @@
 pub mod boards;
+pub mod images;
 pub mod users;
 
 use anyhow::Result;
@@ -52,9 +53,22 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS board_images (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+            uploader_id UUID NOT NULL REFERENCES users(id),
+            filename VARCHAR(255),
+            content_type VARCHAR(100) NOT NULL DEFAULT 'image/png',
+            data BYTEA NOT NULL,
+            width INTEGER,
+            height INTEGER,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
         CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards(owner_id);
         CREATE INDEX IF NOT EXISTS idx_collaborators_user ON board_collaborators(user_id);
         CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token);
+        CREATE INDEX IF NOT EXISTS idx_board_images_board ON board_images(board_id);
         "#,
     )
     .execute(pool)

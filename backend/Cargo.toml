@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7.9", features = ["ws", "macros"] }
+axum = { version = "0.7.9", features = ["ws", "macros", "multipart"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
 tokio = { version = "1.42.0", features = ["full"] }
 tower = { version = "0.5.2" }

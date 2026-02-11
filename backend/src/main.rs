@@ -68,8 +68,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/register", post(api::users::register))
         .route("/api/auth/login", post(api::users::login))
         .route(
-            "/api/share/{token}",
+            "/api/share/:token",
             get(api::boards::get_board_by_share_token),
+        )
+        .route(
+            "/api/boards/:board_id/images/:image_id",
+            get(api::images::get_image),
         );
 
     // Protected routes (auth required)
@@ -77,34 +81,38 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/me", get(api::users::me))
         .route("/api/boards", get(api::boards::list_boards))
         .route("/api/boards", post(api::boards::create_board))
-        .route("/api/boards/{id}", get(api::boards::get_board))
-        .route("/api/boards/{id}", put(api::boards::update_board))
-        .route("/api/boards/{id}", delete(api::boards::delete_board))
+        .route("/api/boards/:id", get(api::boards::get_board))
+        .route("/api/boards/:id", put(api::boards::update_board))
+        .route("/api/boards/:id", delete(api::boards::delete_board))
         .route(
-            "/api/boards/{id}/collaborators",
+            "/api/boards/:id/collaborators",
             post(api::boards::add_collaborator),
         )
         .route(
-            "/api/boards/{board_id}/collaborators/{user_id}",
+            "/api/boards/:board_id/collaborators/:user_id",
             delete(api::boards::remove_collaborator),
         )
         .route(
-            "/api/boards/{id}/share-links",
+            "/api/boards/:id/share-links",
             post(api::boards::create_share_link),
         )
         .route(
-            "/api/boards/{id}/share-links",
+            "/api/boards/:id/share-links",
             get(api::boards::get_share_links),
         )
         .route(
-            "/api/boards/{board_id}/share-links/{link_id}",
+            "/api/boards/:board_id/share-links/:link_id",
             delete(api::boards::delete_share_link),
+        )
+        .route(
+            "/api/boards/:id/images",
+            post(api::images::upload_image),
         )
         .layer(middleware::from_fn(auth::middleware::auth_middleware))
         .layer(inject_secret);
 
     // WebSocket route
-    let ws_routes = Router::new().route("/ws/{board_id}", get(ws::handler::ws_handler));
+    let ws_routes = Router::new().route("/ws/:board_id", get(ws::handler::ws_handler));
 
     // Static file serving
     let static_service = ServeDir::new("static").append_index_html_on_directories(true);
