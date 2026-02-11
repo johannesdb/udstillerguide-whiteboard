@@ -3,12 +3,17 @@ import {
     createStickyNote, createRect, createCircle, createTriangle,
     createDiamond, createStar, createHexagon,
     createLine, createArrow, createDrawing, createText, createTextBox,
+    createConnector, getAnchorPoints, resolveConnectorEndpoints,
     hitTest, hitTestResizeHandle,
-} from '/js/canvas.js';
+} from '/js/canvas.js?v=2';
+import { WhiteboardPlugins } from '/js/plugins.js?v=2';
 
 // All shape-type tools that use drag-to-create
 const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
 const LINE_TOOLS = new Set(['line', 'arrow']);
+
+// Marker types for ER diagrams and general use
+const MARKER_TYPES = ['none', 'arrow', 'open-arrow', 'one', 'many', 'one-many', 'zero-many', 'zero-one'];
 
 export class ToolManager {
     constructor(app) {
@@ -26,8 +31,38 @@ export class ToolManager {
         this.selectionRect = null;
         this.spaceDown = false;
 
+        // Connector tool state
+        this.connectorSource = null;      // { elementId, anchor }
+        this.connectorHoveredEl = null;    // element being hovered during connector creation
+        this.connectorHoveredAnchor = null; // anchor point being hovered
+
         this.setupCanvasEvents();
         this.setupToolbarEvents();
+        this.setupConnectorConfig();
+        this.registerPluginTools();
+    }
+
+    registerPluginTools() {
+        const pluginTools = WhiteboardPlugins.tools;
+        if (!pluginTools || pluginTools.length === 0) return;
+
+        const toolbar = document.getElementById('toolbar');
+        if (!toolbar) return;
+
+        // Add separator before plugin tools
+        const sep = document.createElement('div');
+        sep.className = 'tool-separator';
+        toolbar.appendChild(sep);
+
+        for (const tool of pluginTools) {
+            const btn = document.createElement('button');
+            btn.className = 'tool-btn';
+            btn.dataset.tool = tool.name;
+            btn.title = tool.title || tool.name;
+            if (tool.icon) btn.innerHTML = tool.icon;
+            btn.addEventListener('click', () => this.setTool(tool.name));
+            toolbar.appendChild(btn);
+        }
     }
 
     setTool(tool) {
@@ -40,14 +75,23 @@ export class ToolManager {
             select: 'default', pan: 'grab',
             sticky: 'crosshair', rect: 'crosshair', circle: 'crosshair',
             triangle: 'crosshair', diamond: 'crosshair', star: 'crosshair', hexagon: 'crosshair',
-            line: 'crosshair', arrow: 'crosshair',
+            line: 'crosshair', arrow: 'crosshair', connector: 'crosshair',
             draw: 'crosshair', text: 'text', textbox: 'crosshair',
         };
+        // Check plugin tools for cursor
+        if (!cursorMap[tool]) {
+            const pluginTool = WhiteboardPlugins.tools.find(t => t.name === tool);
+            if (pluginTool) cursorMap[tool] = pluginTool.cursor || 'crosshair';
+        }
         this.app.canvas.style.cursor = cursorMap[tool] || 'default';
 
         if (tool !== 'color') document.getElementById('color-picker')?.classList.remove('visible');
         if (tool !== 'stroke-width') document.getElementById('stroke-picker')?.classList.remove('visible');
         if (tool !== 'fill-color') document.getElementById('fill-picker')?.classList.remove('visible');
+        // Reset connector state when switching tools
+        this.connectorSource = null;
+        this.connectorHoveredEl = null;
+        this.connectorHoveredAnchor = null;
     }
 
     setupToolbarEvents() {
@@ -195,12 +239,20 @@ export class ToolManager {
             this.onShapeDown(world);
         } else if (LINE_TOOLS.has(tool)) {
             this.onLineDown(world);
+        } else if (tool === 'connector') {
+            this.onConnectorDown(world);
         } else if (tool === 'draw') {
             this.onDrawDown(world);
         } else if (tool === 'text') {
             this.onTextDown(world);
         } else if (tool === 'textbox') {
             this.onTextBoxDown(world);
+        } else {
+            // Check plugin tools
+            const pluginTool = WhiteboardPlugins.tools.find(t => t.name === tool);
+            if (pluginTool && pluginTool.onDown) {
+                pluginTool.onDown(world, this.app);
+            }
         }
     }
 
@@ -225,10 +277,18 @@ export class ToolManager {
             this.onShapeMove(world);
         } else if (LINE_TOOLS.has(tool)) {
             this.onLineMove(world);
+        } else if (tool === 'connector') {
+            this.onConnectorMove(world);
         } else if (tool === 'draw') {
             this.onDrawMove(world);
         } else if (tool === 'textbox') {
             this.onTextBoxMove(world);
+        } else {
+            // Check plugin tools
+            const pluginTool = WhiteboardPlugins.tools.find(t => t.name === tool);
+            if (pluginTool && pluginTool.onMove) {
+                pluginTool.onMove(world, this.app);
+            }
         }
     }
 
@@ -249,10 +309,18 @@ export class ToolManager {
             this.onShapeUp(world);
         } else if (LINE_TOOLS.has(tool)) {
             this.onLineUp(world);
+        } else if (tool === 'connector') {
+            this.onConnectorUp(world);
         } else if (tool === 'draw') {
             this.onDrawUp();
         } else if (tool === 'textbox') {
             this.onTextBoxUp(world);
+        } else {
+            // Check plugin tools
+            const pluginTool = WhiteboardPlugins.tools.find(t => t.name === tool);
+            if (pluginTool && pluginTool.onUp) {
+                pluginTool.onUp(world, this.app);
+            }
         }
     }
 
@@ -260,8 +328,11 @@ export class ToolManager {
         const cam = this.app.camera;
         const world = cam.screenToWorld(e.offsetX, e.offsetY);
         const el = this.app.hitTestElements(world.x, world.y);
-        if (el && (el.type === 'sticky' || el.type === 'text' || el.type === 'textbox')) {
+        if (!el) return;
+        if (el.type === 'sticky' || el.type === 'text' || el.type === 'textbox') {
             this.startTextEdit(el);
+        } else if (el.type === 'connector') {
+            this.startConnectorLabelEdit(el);
         }
     }
 
@@ -335,6 +406,7 @@ export class ToolManager {
             for (const id of this.app.selectedIds) {
                 const el = this.app.getElementById(id);
                 if (!el) continue;
+                if (el.type === 'connector') continue; // connectors follow their source/target
                 el.x += dx; el.y += dy;
                 if (el.type === 'line' || el.type === 'arrow') { el.x2 += dx; el.y2 += dy; }
                 if (el.type === 'drawing') { for (const p of el.points) { p.x += dx; p.y += dy; } }
@@ -531,6 +603,176 @@ export class ToolManager {
         this.startTextEdit(el);
     }
 
+    // === Connector Tool ===
+    findNearestAnchor(world, excludeId = null) {
+        const threshold = 15 / this.app.camera.zoom;
+        let bestEl = null, bestAnchor = null, bestDist = Infinity;
+        for (const el of this.app.elements) {
+            if (el.id === excludeId) continue;
+            const anchors = getAnchorPoints(el);
+            for (const a of anchors) {
+                const d = Math.hypot(a.x - world.x, a.y - world.y);
+                if (d < threshold && d < bestDist) {
+                    bestDist = d; bestEl = el; bestAnchor = a;
+                }
+            }
+        }
+        return bestEl ? { element: bestEl, anchor: bestAnchor } : null;
+    }
+
+    onConnectorDown(world) {
+        const snap = this.findNearestAnchor(world);
+        if (snap) {
+            this.connectorSource = { elementId: snap.element.id, anchor: snap.anchor.name };
+            this.isDrawing = true;
+            this.dragStart = { x: snap.anchor.x, y: snap.anchor.y };
+        }
+    }
+
+    onConnectorMove(world) {
+        // Update hovered anchor for visual feedback
+        const snap = this.findNearestAnchor(world, this.connectorSource?.elementId);
+        this.connectorHoveredEl = snap ? snap.element : null;
+        this.connectorHoveredAnchor = snap ? snap.anchor : null;
+
+        if (!this.isDrawing || !this.dragStart) return;
+        const endX = snap ? snap.anchor.x : world.x;
+        const endY = snap ? snap.anchor.y : world.y;
+        this.previewElement = {
+            type: 'arrow',
+            x: this.dragStart.x, y: this.dragStart.y,
+            x2: endX, y2: endY,
+            color: this.app.currentColor,
+            strokeWidth: this.app.currentStrokeWidth,
+        };
+    }
+
+    onConnectorUp(world) {
+        if (!this.isDrawing || !this.connectorSource) {
+            this.isDrawing = false;
+            this.previewElement = null;
+            this.connectorSource = null;
+            return;
+        }
+        this.isDrawing = false;
+        this.previewElement = null;
+
+        const snap = this.findNearestAnchor(world, this.connectorSource.elementId);
+        if (snap) {
+            const el = createConnector(
+                this.connectorSource.elementId,
+                snap.element.id,
+                this.connectorSource.anchor,
+                snap.anchor.name,
+                this.app.currentColor,
+                this.app.currentStrokeWidth,
+            );
+            this.app.addElement(el);
+            this.app.selectedIds = new Set([el.id]);
+            this.showConnectorConfig(el);
+        }
+        this.connectorSource = null;
+    }
+
+    startConnectorLabelEdit(el) {
+        const pts = resolveConnectorEndpoints(el, this.app.elements);
+        const mx = (pts.sx + pts.ex) / 2;
+        const my = (pts.sy + pts.ey) / 2;
+
+        const overlay = document.getElementById('text-input-overlay');
+        const input = document.getElementById('text-input');
+        const s = this.app.camera.worldToScreen(mx, my);
+
+        overlay.style.display = 'block';
+        overlay.style.left = (s.x - 50) + 'px';
+        overlay.style.top = (s.y - 15) + 'px';
+        input.value = el.label || '';
+        input.style.width = '120px';
+        input.style.height = '';
+        input.focus();
+        input.select();
+
+        const submit = () => {
+            const text = input.value.trim();
+            overlay.style.display = 'none';
+            input.style.width = '';
+            input.removeEventListener('blur', submit);
+            input.removeEventListener('keydown', onKey);
+            this.app.updateElement(el.id, { label: text });
+            this.app.saveHistory();
+        };
+
+        const onKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submit(); }
+            if (e.key === 'Escape') {
+                overlay.style.display = 'none';
+                input.style.width = '';
+                input.removeEventListener('blur', submit);
+                input.removeEventListener('keydown', onKey);
+            }
+        };
+
+        input.addEventListener('blur', submit);
+        input.addEventListener('keydown', onKey);
+    }
+
+    // === Connector Config Panel ===
+    setupConnectorConfig() {
+        const panel = document.getElementById('connector-config');
+        if (!panel) return;
+
+        panel.querySelectorAll('.marker-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const end = btn.dataset.end;    // 'source' or 'target'
+                const marker = btn.dataset.marker;
+                const group = btn.closest('.marker-group');
+                group.querySelectorAll('.marker-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.updateSelectedConnectorProp(end === 'source' ? 'sourceMarker' : 'targetMarker', marker);
+            });
+        });
+
+        panel.querySelectorAll('.line-style-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const style = btn.dataset.style;
+                panel.querySelectorAll('.line-style-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.updateSelectedConnectorProp('lineStyle', style);
+            });
+        });
+    }
+
+    updateSelectedConnectorProp(prop, value) {
+        for (const id of this.app.selectedIds) {
+            const el = this.app.getElementById(id);
+            if (el && el.type === 'connector') {
+                this.app.updateElement(id, { [prop]: value });
+            }
+        }
+        this.app.saveHistory();
+    }
+
+    showConnectorConfig(el) {
+        const panel = document.getElementById('connector-config');
+        if (!panel) return;
+        panel.classList.add('visible');
+
+        // Set active states
+        panel.querySelectorAll('[data-end="source"].marker-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.marker === (el.sourceMarker || 'none'));
+        });
+        panel.querySelectorAll('[data-end="target"].marker-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.marker === (el.targetMarker || 'arrow'));
+        });
+        panel.querySelectorAll('.line-style-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.style === (el.lineStyle || 'solid'));
+        });
+    }
+
+    hideConnectorConfig() {
+        document.getElementById('connector-config')?.classList.remove('visible');
+    }
+
     startTextInput(wx, wy) {
         const overlay = document.getElementById('text-input-overlay');
         const input = document.getElementById('text-input');
@@ -615,10 +857,47 @@ export class ToolManager {
         input.addEventListener('keydown', onKey);
     }
 
+    getSelectedConnector() {
+        if (this.app.selectedIds.size !== 1) return null;
+        const id = [...this.app.selectedIds][0];
+        const el = this.app.getElementById(id);
+        return el && el.type === 'connector' ? el : null;
+    }
+
     // === Draw Preview ===
     drawPreview(ctx) {
         if (this.previewElement) {
             this.app.drawElement(ctx, this.previewElement);
+        }
+
+        // Connector tool: draw anchor points on all connectable elements
+        if (this.currentTool === 'connector') {
+            const cam = this.app.camera;
+            for (const el of this.app.elements) {
+                const anchors = getAnchorPoints(el);
+                for (const a of anchors) {
+                    const s = cam.worldToScreen(a.x, a.y);
+                    const isHovered = this.connectorHoveredAnchor &&
+                        this.connectorHoveredAnchor.x === a.x && this.connectorHoveredAnchor.y === a.y;
+                    const radius = isHovered ? 6 : 4;
+
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = isHovered ? '#2196F3' : 'rgba(33, 150, 243, 0.3)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#2196F3';
+                    ctx.lineWidth = isHovered ? 2 : 1;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Show/hide connector config panel based on selection
+        const selectedConnector = this.getSelectedConnector();
+        if (selectedConnector) {
+            this.showConnectorConfig(selectedConnector);
+        } else {
+            this.hideConnectorConfig();
         }
 
         // Freehand preview
