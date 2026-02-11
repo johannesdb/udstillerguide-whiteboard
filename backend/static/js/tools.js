@@ -463,6 +463,8 @@ export class ToolManager {
             this.app.addElement(conn);
         }
         this.chainPrevElementId = sticky.id;
+        // Immediately open text editor so user can type before chaining
+        this.startTextEdit(sticky, { chainMode: true });
     }
 
     // === Shape Tools (rect, circle, triangle, diamond, star, hexagon) ===
@@ -847,7 +849,8 @@ export class ToolManager {
         input.addEventListener('keydown', onKey);
     }
 
-    startTextEdit(el) {
+    startTextEdit(el, options = {}) {
+        const chainMode = options.chainMode || false;
         const overlay = document.getElementById('text-input-overlay');
         const input = document.getElementById('text-input');
         const s = this.app.camera.worldToScreen(el.x, el.y);
@@ -868,25 +871,52 @@ export class ToolManager {
         input.focus();
         input.select();
 
-        const submit = () => {
-            const text = input.value;
+        const cleanup = () => {
             overlay.style.display = 'none';
             input.style.width = ''; input.style.height = '';
             input.removeEventListener('blur', submit);
             input.removeEventListener('keydown', onKey);
+        };
+
+        const submit = () => {
+            const text = input.value;
+            cleanup();
             this.app.updateElement(el.id, { content: text });
             this.app.saveHistory();
+            // In chain mode, keep sticky tool active for next click
+            if (chainMode) {
+                this.setTool('sticky');
+            }
         };
 
         const onKey = (e) => {
             if (e.key === 'Enter' && !e.shiftKey && el.type !== 'sticky' && el.type !== 'textbox') {
                 e.preventDefault(); submit();
             }
+            if (e.key === 'Tab' && chainMode) {
+                e.preventDefault();
+                // Save text, then create next connected sticky to the right
+                const text = input.value;
+                cleanup();
+                this.app.updateElement(el.id, { content: text });
+                this.app.saveHistory();
+                this.setTool('sticky');
+                // Place next sticky to the right with 50px gap
+                this.onStickyDown({ x: el.x + el.width + 50 + 100, y: el.y + 100 });
+            }
             if (e.key === 'Escape') {
-                overlay.style.display = 'none';
-                input.style.width = ''; input.style.height = '';
-                input.removeEventListener('blur', submit);
-                input.removeEventListener('keydown', onKey);
+                cleanup();
+                if (chainMode) {
+                    // Save any text that was entered
+                    const text = input.value;
+                    if (text) {
+                        this.app.updateElement(el.id, { content: text });
+                        this.app.saveHistory();
+                    }
+                    // Break chain and switch to select
+                    this.chainPrevElementId = null;
+                    this.setTool('select');
+                }
             }
         };
 
