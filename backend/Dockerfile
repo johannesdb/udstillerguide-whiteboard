@@ -19,7 +19,7 @@ COPY --from=builder /app/target/release/udstillerguide-whiteboard .
 COPY static/ static/
 
 ARG VERSION=dev
-RUN sed -i "s/?v=[0-9][0-9]*/?v=${VERSION}/g" static/index.html static/board.html static/js/app.js static/js/canvas.js static/js/tools.js static/js/ui.js
+RUN sed -i "s/?v=[a-zA-Z0-9_.-]*/?v=${VERSION}/g" static/index.html static/board.html static/js/app.js static/js/canvas.js static/js/tools.js static/js/ui.js
 
 EXPOSE 3000
 
