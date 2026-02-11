@@ -221,6 +221,17 @@ pub async fn delete_share_link(pool: &PgPool, link_id: Uuid) -> Result<bool> {
     Ok(result.rows_affected() > 0)
 }
 
+pub async fn regenerate_share_link(pool: &PgPool, link_id: Uuid, new_token: &str) -> Result<Option<ShareLink>> {
+    let link = sqlx::query_as::<_, ShareLink>(
+        "UPDATE share_links SET token = $1 WHERE id = $2 RETURNING *",
+    )
+    .bind(new_token)
+    .bind(link_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(link)
+}
+
 pub async fn get_share_links_for_board(pool: &PgPool, board_id: Uuid) -> Result<Vec<ShareLink>> {
     let links = sqlx::query_as::<_, ShareLink>("SELECT * FROM share_links WHERE board_id = $1")
         .bind(board_id)

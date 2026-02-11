@@ -235,6 +235,7 @@ export class UIManager {
                         </span>
                         <div style="display:flex; gap:4px">
                             <button class="copy-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px" data-url="${shareUrl}">Copy</button>
+                            <button class="regenerate-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px; color:#e65100" data-id="${link.id}" title="Generate new code (old link stops working)">Reset</button>
                             <button class="delete-link" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:12px; color:#c62828" data-id="${link.id}">Delete</button>
                         </div>
                     `;
@@ -243,6 +244,26 @@ export class UIManager {
                     item.querySelector('.copy-link').addEventListener('click', async (e) => {
                         await navigator.clipboard.writeText(e.target.dataset.url).catch(() => {});
                         this.showToast('Link copied!');
+                    });
+
+                    item.querySelector('.regenerate-link').addEventListener('click', async (e) => {
+                        try {
+                            const res = await apiFetch(`/api/boards/${this.app.boardId}/share-links/${e.target.dataset.id}/regenerate`, {
+                                method: 'POST',
+                            });
+                            if (res.ok) {
+                                const updated = await res.json();
+                                this.loadShareLinks();
+                                const newUrl = `${window.location.origin}/board.html?id=${this.app.boardId}&share=${updated.token}`;
+                                await navigator.clipboard.writeText(newUrl).catch(() => {});
+                                this.showToast('Share link reset and new link copied!');
+                            } else {
+                                const err = await res.json();
+                                this.showToast(err.error || 'Failed to reset link');
+                            }
+                        } catch (err) {
+                            this.showToast('Failed to reset link');
+                        }
                     });
 
                     item.querySelector('.delete-link').addEventListener('click', async (e) => {

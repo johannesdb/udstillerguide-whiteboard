@@ -576,6 +576,66 @@ pub async fn delete_share_link(
     }
 }
 
+pub async fn regenerate_share_link(
+    State(state): State<Arc<AppState>>,
+    Path((board_id, link_id)): Path<(Uuid, Uuid)>,
+    request: axum::extract::Request,
+) -> impl IntoResponse {
+    let claims = match get_claims(request.extensions()) {
+        Some(c) => c,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Not authenticated"})),
+            )
+                .into_response()
+        }
+    };
+
+    match db::boards::user_has_access(&state.pool, board_id, claims.sub).await {
+        Ok(Some(role)) if role == "owner" || role == "admin" => {}
+        _ => {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({"error": "Not authorized to regenerate share links"})),
+            )
+                .into_response()
+        }
+    }
+
+    let new_token: String = {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        (0..64)
+            .map(|_| {
+                let idx = rng.gen_range(0..36);
+                if idx < 10 {
+                    (b'0' + idx) as char
+                } else {
+                    (b'a' + idx - 10) as char
+                }
+            })
+            .collect()
+    };
+
+    match db::boards::regenerate_share_link(&state.pool, link_id, &new_token).await {
+        Ok(Some(link)) => Json(serde_json::to_value(link).unwrap()).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Share link not found"})),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("Regenerate share link error: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to regenerate share link"})),
+            )
+                .into_response()
+        }
+    }
+}
+
 /// Get board info via share token (no auth required)
 pub async fn get_board_by_share_token(
     State(state): State<Arc<AppState>>,

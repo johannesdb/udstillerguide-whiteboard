@@ -107,6 +107,10 @@ async fn main() -> anyhow::Result<()> {
             delete(api::boards::delete_share_link),
         )
         .route(
+            "/api/boards/:board_id/share-links/:link_id/regenerate",
+            post(api::boards::regenerate_share_link),
+        )
+        .route(
             "/api/boards/:id/images",
             post(api::images::upload_image),
         )
