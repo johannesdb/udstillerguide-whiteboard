@@ -7,20 +7,18 @@ ARG WEBAWESOME_NPM_TOKEN
 RUN npm ci --ignore-scripts
 RUN rm -f .npmrc
 
-# Bundle Web Awesome + all deps into a single JS file
+# Bundle Web Awesome + all components into a single JS file
 COPY static/webawesome-entry.js ./
 RUN npx esbuild webawesome-entry.js \
     --bundle \
     --format=esm \
-    --outfile=vendor/webawesome-bundle.js \
+    --outfile=vendor/webawesome/webawesome.bundle.js \
     --external:react \
     --external:@lit/react
 
-# Copy Web Awesome CSS and assets (styles, icons, components for autoloader)
-RUN mkdir -p vendor/webawesome && \
-    cp -r node_modules/@awesome.me/webawesome-pro/dist/styles vendor/webawesome/styles && \
-    cp -r node_modules/@awesome.me/webawesome-pro/dist/components vendor/webawesome/components && \
-    cp -r node_modules/@awesome.me/webawesome-pro/dist/chunks vendor/webawesome/chunks
+# Copy Web Awesome CSS assets
+RUN mkdir -p vendor/webawesome/styles && \
+    cp -r node_modules/@awesome.me/webawesome-pro/dist/styles/* vendor/webawesome/styles/
 
 FROM rust:latest AS builder
 
