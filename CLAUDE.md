@@ -41,3 +41,9 @@
 - Fejl MÅ ALDRIG swallowes stille
 - Alle fejl SKAL logges til error_log tabellen med fuld kontekst
 - Kritiske fejl (severity: critical) SKAL oprette en Beads task automatisk
+
+## Deploy
+
+- Deploy-script: `bash deploy.sh` (pusher til origin, SSH'er til server, puller og rebuilder Docker)
+- Server: `udstillerguide` (SSH alias), remote dir: `/opt/udstillerguide-whiteboard`
+- Docker build kræver `WEBAWESOME_NPM_TOKEN` i serverens `.env`
