@@ -51,89 +51,79 @@
     <div id="toolbar">
         <!-- Selection & Navigation -->
         <button class="tool-btn active" data-tool="select" id="tool-select">
-            <svg viewBox="0 0 24 24"><path d="M4 4l7 19 2.5-7.5L21 13z"/></svg>
+            <wa-icon name="arrow-pointer" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="pan" id="tool-pan">
-            <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <wa-icon name="hand" family="duotone" variant="thin"></wa-icon>
         </button>
 
         <div class="tool-separator"></div>
 
         <!-- Post-it / Sticky Note -->
         <button class="tool-btn" data-tool="sticky" id="tool-sticky">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#FFF176" stroke="#E6D96A" stroke-width="1.5"/><path d="M15 3v6h6" fill="#E6D96A" stroke="none"/><line x1="7" y1="10" x2="17" y2="10" stroke="#999" stroke-width="1"/><line x1="7" y1="14" x2="14" y2="14" stroke="#999" stroke-width="1"/></svg>
+            <wa-icon name="note-sticky" family="duotone" variant="thin"></wa-icon>
         </button>
         <!-- Text Box -->
         <button class="tool-btn" data-tool="textbox" id="tool-textbox">
-            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none"/><line x1="7" y1="9" x2="17" y2="9" stroke-width="1.5"/><line x1="7" y1="13" x2="15" y2="13" stroke-width="1.5"/><line x1="7" y1="17" x2="12" y2="17" stroke-width="1.5"/></svg>
+            <wa-icon name="rectangle-list" family="duotone" variant="thin"></wa-icon>
         </button>
 
         <div class="tool-separator"></div>
 
         <!-- Shapes -->
         <button class="tool-btn" data-tool="rect" id="tool-rect">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/></svg>
+            <wa-icon name="square" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="circle" id="tool-circle">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+            <wa-icon name="circle" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="triangle" id="tool-triangle">
-            <svg viewBox="0 0 24 24"><polygon points="12,3 22,21 2,21" fill="none"/></svg>
+            <wa-icon name="triangle" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="diamond" id="tool-diamond">
-            <svg viewBox="0 0 24 24"><polygon points="12,2 22,12 12,22 2,12" fill="none"/></svg>
+            <wa-icon name="diamond" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="hexagon" id="tool-hexagon">
-            <svg viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="none"/></svg>
+            <wa-icon name="hexagon" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="star" id="tool-star">
-            <svg viewBox="0 0 24 24"><polygon points="12,2 15,9 22,9 16.5,14 18.5,21 12,17 5.5,21 7.5,14 2,9 9,9" fill="none"/></svg>
+            <wa-icon name="star" family="duotone" variant="thin"></wa-icon>
         </button>
 
         <div class="tool-separator"></div>
 
         <!-- Lines -->
         <button class="tool-btn" data-tool="line" id="tool-line">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+            <wa-icon name="slash-forward" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="arrow" id="tool-arrow">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="10 5 19 5 19 14"/></svg>
+            <wa-icon name="arrow-right-long" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="connector" id="tool-connector">
-            <svg viewBox="0 0 24 24">
-                <rect x="2" y="2" width="7" height="7" rx="1" fill="none"/>
-                <rect x="15" y="15" width="7" height="7" rx="1" fill="none"/>
-                <line x1="9" y1="5.5" x2="15" y2="18.5" stroke-dasharray="2 2"/>
-                <polygon points="15,18.5 12.5,14.5 17.5,14.5" fill="currentColor" stroke="none"/>
-            </svg>
+            <wa-icon name="diagram-project" family="duotone" variant="thin"></wa-icon>
         </button>
 
         <div class="tool-separator"></div>
 
         <!-- Drawing & Text -->
         <button class="tool-btn" data-tool="draw" id="tool-draw">
-            <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+            <wa-icon name="pen" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="text" id="tool-text">
-            <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+            <wa-icon name="font" family="duotone" variant="thin"></wa-icon>
         </button>
 
         <div class="tool-separator"></div>
 
         <!-- Style controls -->
         <button class="tool-btn" data-tool="color" id="tool-color">
-            <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="9" fill="currentColor" stroke="currentColor"/>
-            </svg>
+            <wa-icon name="palette" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="fill-color" id="tool-fill-color">
-            <svg viewBox="0 0 24 24">
-                <rect x="4" y="4" width="16" height="16" rx="2" fill="#eee" stroke="currentColor" stroke-width="2"/>
-                <path d="M4 14l8-8 8 8" fill="currentColor" opacity="0.3"/>
-            </svg>
+            <wa-icon name="fill-drip" family="duotone" variant="thin"></wa-icon>
         </button>
         <button class="tool-btn" data-tool="stroke-width" id="tool-stroke-width">
-            <svg viewBox="0 0 24 24"><line x1="4" y1="8" x2="20" y2="8" stroke-width="1"/><line x1="4" y1="14" x2="20" y2="14" stroke-width="3"/><line x1="4" y1="20" x2="20" y2="20" stroke-width="5"/></svg>
+            <wa-icon name="grip-lines" family="duotone" variant="thin"></wa-icon>
         </button>
     </div>
 
