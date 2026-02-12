@@ -153,7 +153,7 @@ html, body {
 
 #stroke-picker label {
     color: var(--toolbar-text);
-    font-size: 13px;
+    font-size: 15px;
 }
 
 /* Style wa-slider in the dark panel */
