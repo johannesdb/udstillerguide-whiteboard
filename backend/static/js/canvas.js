@@ -1,12 +1,12 @@
 // Canvas rendering engine - the core of the whiteboard
 // Implements: camera, world coordinates, render loop, hit testing, element management
 
-import { ToolManager } from '/js/tools.js?v=2';
-import { UIManager } from '/js/ui.js?v=2';
-import { SyncManager } from '/js/sync.js?v=2';
-import { getToken } from '/js/auth.js?v=2';
-import { WhiteboardPlugins } from '/js/plugins.js?v=2';
-import { errorHandler } from '/js/error-handler.js?v=2';
+import { ToolManager } from '/js/tools.js?v=4';
+import { UIManager } from '/js/ui.js?v=4';
+import { SyncManager } from '/js/sync.js?v=4';
+import { getToken } from '/js/auth.js?v=4';
+import { WhiteboardPlugins } from '/js/plugins.js?v=4';
+import { errorHandler } from '/js/error-handler.js?v=4';
 
 const imageCache = new Map();
 function loadImage(src) {
@@ -611,7 +611,7 @@ export class WhiteboardApp {
     async uploadImage(file, worldX, worldY) {
         const formData = new FormData();
         formData.append('file', file);
-        const { apiFetch } = await import('/js/auth.js?v=2');
+        const { apiFetch } = await import('/js/auth.js?v=4');
         const res = await apiFetch(`/api/boards/${this.boardId}/images`, {
             method: 'POST',
             body: formData,
@@ -808,7 +808,7 @@ export class WhiteboardApp {
     drawElement(ctx, el) {
         const typeDef = WhiteboardPlugins.getElementType(el.type);
         if (typeDef && typeDef.draw) {
-            typeDef.draw(ctx, el);
+            typeDef.draw(ctx, el, this);
         }
     }
 

@@ -1,6 +1,6 @@
 // UI Manager - handles UI overlays, modals, and board-level interactions
-import { apiFetch, getToken, getUser } from '/js/auth.js?v=3';
-import { WhiteboardPlugins } from '/js/plugins.js?v=3';
+import { apiFetch, getToken, getUser } from '/js/auth.js?v=4';
+import { WhiteboardPlugins } from '/js/plugins.js?v=4';
 
 export class UIManager {
     constructor(app) {

@@ -1,7 +1,7 @@
 // Sync Manager - Yjs-based collaborative sync via y-websocket
 // Uses vendored Yjs (Y.Doc + Y.Map) and y-websocket (WebSocketProvider + Awareness)
 
-import { errorHandler } from '/js/error-handler.js?v=2';
+import { errorHandler } from '/js/error-handler.js?v=4';
 import * as Y from '/js/vendor/yjs.mjs';
 import { WebsocketProvider } from '/js/vendor/y-websocket.mjs';
 
