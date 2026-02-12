@@ -1,5 +1,6 @@
 pub mod boards;
 pub mod images;
+pub mod ug_connections;
 pub mod users;
 
 use anyhow::Result;
@@ -97,6 +98,17 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
         ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+
+        -- UG Core connection per board (1:1)
+        CREATE TABLE IF NOT EXISTS ug_connections (
+            board_id     UUID PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE,
+            ug_base_url  TEXT NOT NULL,
+            api_key      TEXT NOT NULL,
+            messe_id     TEXT NOT NULL,
+            last_synced  TIMESTAMPTZ,
+            sync_enabled BOOLEAN NOT NULL DEFAULT true,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
         "#,
     )
     .execute(pool)

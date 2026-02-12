@@ -2,20 +2,17 @@
 // Producerer to views: (1) Spatial gulvplan, (2) Hierarki-diagram
 
 import { generateId, createConnector } from '/js/canvas.js?v=4';
-import {
-    MOCK_HALLER, MOCK_STANDE, MOCK_UDSTILLERE, MOCK_MESSE, MOCK_TAXONOMIER,
-    getUdstiller, getStandeForHal, STATUS_FARVER,
-} from './ug-mock-data.js';
+import { STATUS_FARVER, findUdstiller, getStandeForHal } from './ug-api.js?v=4';
 import { UG_ELEMENT_TYPES } from './ug-elements.js';
 
 // === Gulvplan (View 1) ===
 
-export function generateGulvplan(app, originX = 100, originY = 100) {
+export function generateGulvplan(app, data, originX = 100, originY = 100) {
     const elements = [];
     const gap = 60;
     let halX = originX;
 
-    for (const hal of MOCK_HALLER) {
+    for (const hal of data.haller) {
         // Opret hal-element
         const halEl = {
             id: generateId(),
@@ -31,14 +28,14 @@ export function generateGulvplan(app, originX = 100, originY = 100) {
             external: {
                 id: hal.id,
                 type: 'hal',
-                syncStatus: 'local-only',
+                syncStatus: 'synced',
                 data: { ...hal },
             },
         };
         elements.push(halEl);
 
         // Placer stande inden i hallen i et grid
-        const stande = getStandeForHal(hal.id);
+        const stande = getStandeForHal(data.stande, hal.id);
         const standPadding = 20;
         const headerH = 45; // plads til hal-navn
         const standGap = 15;
@@ -47,7 +44,7 @@ export function generateGulvplan(app, originX = 100, originY = 100) {
         stande.forEach((stand, idx) => {
             const col = idx % cols;
             const row = Math.floor(idx / cols);
-            const udstiller = getUdstiller(stand.udstillerId);
+            const udstiller = findUdstiller(data.udstillere, stand.udstiller_id);
             const standLabel = udstiller ? udstiller.firmanavn : 'LEDIG';
 
             const standEl = {
@@ -63,7 +60,7 @@ export function generateGulvplan(app, originX = 100, originY = 100) {
                 external: {
                     id: stand.id,
                     type: 'stand',
-                    syncStatus: 'local-only',
+                    syncStatus: 'synced',
                     data: {
                         standnummer: stand.standnummer,
                         udstiller: standLabel,
@@ -83,7 +80,7 @@ export function generateGulvplan(app, originX = 100, originY = 100) {
 
 // === Hierarki-diagram (View 2) ===
 
-export function generateHierarki(app, originX = 100, originY = 600) {
+export function generateHierarki(app, data, originX = 100, originY = 600) {
     const elements = [];
     const connectors = [];
     const nodeW = 160;
@@ -92,7 +89,7 @@ export function generateHierarki(app, originX = 100, originY = 600) {
     const siblingGap = 30;
 
     // Root: Messe
-    const messeEl = makeNode(originX + 300, originY, nodeW + 40, nodeH + 10, MOCK_MESSE.navn, 'messe');
+    const messeEl = makeNode(originX + 300, originY, nodeW + 40, nodeH + 10, data.messe.navn, 'messe');
     elements.push(messeEl);
 
     // Level 1: Haller
@@ -100,7 +97,7 @@ export function generateHierarki(app, originX = 100, originY = 600) {
     const halY = originY + levelGap;
     const halEls = [];
 
-    MOCK_HALLER.forEach((hal, idx) => {
+    data.haller.forEach((hal, idx) => {
         const x = halStartX + idx * (nodeW + siblingGap);
         const el = makeNode(x, halY, nodeW, nodeH, hal.navn, 'hal', hal.farve);
         elements.push(el);
@@ -111,8 +108,8 @@ export function generateHierarki(app, originX = 100, originY = 600) {
     });
 
     // Level 2: Taxonomier (ved siden af haller)
-    const taxRoots = MOCK_TAXONOMIER.filter(t => t.parent === null);
-    const taxStartX = halStartX + MOCK_HALLER.length * (nodeW + siblingGap) + 60;
+    const taxRoots = data.taxonomier.filter(t => t.parent === null);
+    const taxStartX = halStartX + data.haller.length * (nodeW + siblingGap) + 60;
 
     taxRoots.forEach((taxRoot, idx) => {
         const x = taxStartX + idx * (nodeW + siblingGap);
@@ -123,7 +120,7 @@ export function generateHierarki(app, originX = 100, originY = 600) {
         connectors.push(createConnector(messeEl.id, rootEl.id, 'auto', 'auto', '#999', 1));
 
         // Level 3: Underkategorier
-        const children = MOCK_TAXONOMIER.filter(t => t.parent === taxRoot.id);
+        const children = data.taxonomier.filter(t => t.parent === taxRoot.id);
         const childY = halY + levelGap;
         const childStartX = x - ((children.length - 1) * (nodeW * 0.7 + 10)) / 2;
 
@@ -156,18 +153,18 @@ function makeNode(x, y, w, h, label, nodeType, color = '#333') {
 
 // === Importér begge views til et board ===
 
-export function importMesseData(app) {
+export function importMesseData(app, data) {
     try {
         // Beregn startposition centreret ift. viewport
         const cam = app.camera;
         const viewCenter = cam.screenToWorld(window.innerWidth / 2, window.innerHeight / 3);
 
         // Generér gulvplan (oppe)
-        const gulvplanEls = generateGulvplan(app, viewCenter.x - 400, viewCenter.y - 200);
+        const gulvplanEls = generateGulvplan(app, data, viewCenter.x - 400, viewCenter.y - 200);
 
         // Generér hierarki (nedenunder)
         const hierarkiY = viewCenter.y + 300;
-        const hierarkiEls = generateHierarki(app, viewCenter.x - 400, hierarkiY);
+        const hierarkiEls = generateHierarki(app, data, viewCenter.x - 400, hierarkiY);
 
         // Tilfoej alle elementer til whiteboard
         const allEls = [...gulvplanEls, ...hierarkiEls];

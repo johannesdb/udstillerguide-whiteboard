@@ -1,92 +1,226 @@
 // UG Plugin - Sidebar panel UI
-// Messe-oversigt, import-knap, stand-liste med filtrering, status-oversigt
+// Three states: not connected (form), connected (data overview), loading
 
 import {
-    MOCK_MESSE, MOCK_HALLER, MOCK_STANDE, MOCK_UDSTILLERE,
-    getUdstiller, getStandeForHal, getStatusTaelling, STATUS_FARVER,
-} from './ug-mock-data.js';
-import { importMesseData } from './ug-layout.js';
+    connectUg, disconnectUg, getUgStatus, syncUg,
+    STATUS_FARVER, findUdstiller, getStandeForHal, getStatusTaelling,
+} from './ug-api.js?v=4';
+import { importMesseData } from './ug-layout.js?v=4';
 
 export function renderUgPanel(container, app) {
+    container.innerHTML = '<div style="padding:8px; color:var(--wa-color-neutral-500); font-size:12px">Indlæser...</div>';
+
+    const boardId = app.boardId;
+    if (!boardId) {
+        container.innerHTML = '<div style="padding:8px; color:var(--wa-color-neutral-500)">Intet board valgt</div>';
+        return;
+    }
+
+    getUgStatus(boardId)
+        .then(status => {
+            if (status.connected) {
+                renderConnectedPanel(container, app, status);
+            } else {
+                renderConnectForm(container, app);
+            }
+        })
+        .catch(err => {
+            console.error('UG Panel: status check failed:', err);
+            renderConnectForm(container, app);
+        });
+}
+
+function renderConnectForm(container, app) {
     container.innerHTML = '';
 
-    // === Messe header ===
+    const section = document.createElement('div');
+    section.style.cssText = 'padding:4px 0';
+    section.innerHTML = `
+        <h3 style="margin:0 0 12px; font-size:16px; font-weight:600">Forbind til UG Core</h3>
+        <p style="font-size:12px; color:var(--wa-color-neutral-500); margin:0 0 16px">
+            Indtast forbindelsesoplysninger til UG Core for at importere messedata.
+        </p>
+    `;
+
+    const urlInput = document.createElement('wa-input');
+    urlInput.label = 'UG Core URL';
+    urlInput.placeholder = 'https://ug-core.example.com';
+    urlInput.size = 'small';
+    urlInput.style.cssText = 'margin-bottom:10px; width:100%';
+    section.appendChild(urlInput);
+
+    const keyInput = document.createElement('wa-input');
+    keyInput.label = 'API-nøgle';
+    keyInput.type = 'password';
+    keyInput.size = 'small';
+    keyInput.style.cssText = 'margin-bottom:10px; width:100%';
+    section.appendChild(keyInput);
+
+    const messeInput = document.createElement('wa-input');
+    messeInput.label = 'Messe-ID';
+    messeInput.placeholder = 'messe-001';
+    messeInput.size = 'small';
+    messeInput.style.cssText = 'margin-bottom:16px; width:100%';
+    section.appendChild(messeInput);
+
+    const connectBtn = document.createElement('wa-button');
+    connectBtn.variant = 'brand';
+    connectBtn.size = 'small';
+    connectBtn.style.cssText = 'width:100%';
+    connectBtn.innerHTML = '<wa-icon slot="prefix" name="plug"></wa-icon> Forbind';
+    connectBtn.addEventListener('click', async () => {
+        const url = urlInput.value.trim();
+        const key = keyInput.value.trim();
+        const messeId = messeInput.value.trim();
+
+        if (!url || !key || !messeId) {
+            showPanelToast(app, 'Udfyld alle felter', 'warning');
+            return;
+        }
+
+        connectBtn.loading = true;
+        try {
+            const data = await connectUg(app.boardId, url, key, messeId);
+            const count = importMesseData(app, data);
+            showPanelToast(app, `Forbundet! ${count} elementer importeret`, 'success');
+            renderUgPanel(container, app);
+        } catch (error) {
+            showPanelToast(app, `Fejl: ${error.message}`, 'danger');
+        } finally {
+            connectBtn.loading = false;
+        }
+    });
+    section.appendChild(connectBtn);
+
+    container.appendChild(section);
+}
+
+function renderConnectedPanel(container, app, status) {
+    container.innerHTML = '';
+
     const header = document.createElement('div');
     header.style.cssText = 'margin-bottom:16px';
+    const lastSync = status.last_synced
+        ? new Date(status.last_synced).toLocaleString('da-DK')
+        : 'Aldrig';
     header.innerHTML = `
-        <h3 style="margin:0 0 4px; font-size:16px; font-weight:600">${MOCK_MESSE.navn}</h3>
+        <h3 style="margin:0 0 4px; font-size:16px; font-weight:600">UG Core</h3>
         <div style="font-size:12px; color:var(--wa-color-neutral-500)">
-            ${MOCK_MESSE.dato} &middot; ${MOCK_MESSE.lokation}
+            Messe: ${status.messe_id} &middot; Synkroniseret: ${lastSync}
         </div>
     `;
     container.appendChild(header);
 
-    // === Import-knap ===
-    const importSection = document.createElement('div');
-    importSection.style.cssText = 'margin-bottom:16px';
-    const importBtn = document.createElement('wa-button');
-    importBtn.variant = 'brand';
-    importBtn.size = 'small';
-    importBtn.style.cssText = 'width:100%';
-    importBtn.innerHTML = '<wa-icon slot="prefix" name="file-import"></wa-icon> Importer messe-data';
-    importBtn.addEventListener('click', () => {
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex; gap:6px; margin-bottom:16px';
+
+    const syncBtn = document.createElement('wa-button');
+    syncBtn.variant = 'brand';
+    syncBtn.size = 'small';
+    syncBtn.style.cssText = 'flex:1';
+    syncBtn.innerHTML = '<wa-icon slot="prefix" name="arrows-rotate"></wa-icon> Synkroniser';
+    syncBtn.addEventListener('click', async () => {
+        syncBtn.loading = true;
         try {
-            const count = importMesseData(app);
-            showPanelToast(container, `${count} elementer importeret`, 'success');
+            const data = await syncUg(app.boardId);
+            if (data.haller) {
+                const count = importMesseData(app, data);
+                showPanelToast(app, `${count} elementer opdateret`, 'success');
+            } else if (data.changes) {
+                showPanelToast(app, `${data.changes.length} ændringer hentet`, 'success');
+            }
+            renderUgPanel(container, app);
         } catch (error) {
-            showPanelToast(container, 'Fejl ved import', 'danger');
+            showPanelToast(app, `Sync fejl: ${error.message}`, 'danger');
+        } finally {
+            syncBtn.loading = false;
         }
     });
-    importSection.appendChild(importBtn);
-    container.appendChild(importSection);
+    btnRow.appendChild(syncBtn);
 
-    // === Status-oversigt ===
-    const counts = getStatusTaelling();
-    const statusSection = document.createElement('div');
-    statusSection.style.cssText = 'margin-bottom:16px';
-    statusSection.innerHTML = `
+    const disconnectBtn = document.createElement('wa-button');
+    disconnectBtn.variant = 'default';
+    disconnectBtn.size = 'small';
+    disconnectBtn.innerHTML = '<wa-icon slot="prefix" name="plug-circle-xmark"></wa-icon> Afbryd';
+    disconnectBtn.addEventListener('click', async () => {
+        try {
+            await disconnectUg(app.boardId);
+            showPanelToast(app, 'Afbrudt fra UG Core', 'success');
+            renderUgPanel(container, app);
+        } catch (error) {
+            showPanelToast(app, `Fejl: ${error.message}`, 'danger');
+        }
+    });
+    btnRow.appendChild(disconnectBtn);
+    container.appendChild(btnRow);
+
+    renderLiveDataOverview(container, app);
+}
+
+async function renderLiveDataOverview(container, app) {
+    try {
+        const data = await syncUg(app.boardId);
+        if (data.haller && data.stande) {
+            renderStatusSection(container, data.stande);
+            renderHalSection(container, data.haller, data.stande);
+            renderStandList(container, app, data.stande, data.udstillere);
+        }
+    } catch (error) {
+        const fallback = document.createElement('div');
+        fallback.style.cssText = 'font-size:12px; color:var(--wa-color-neutral-400); padding:8px';
+        fallback.textContent = 'Kunne ikke hente live data. Brug Synkroniser-knappen.';
+        container.appendChild(fallback);
+    }
+}
+
+function renderStatusSection(container, stande) {
+    const counts = getStatusTaelling(stande);
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-bottom:16px';
+    section.innerHTML = `
         <h4 style="margin:0 0 8px; font-size:13px; font-weight:600; color:var(--wa-color-neutral-600)">Status</h4>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px">
-            ${statusBadge('Bekr\u00e6ftet', counts.bekraeftet, STATUS_FARVER.bekraeftet)}
+            ${statusBadge('Bekræftet', counts.bekraeftet, STATUS_FARVER.bekraeftet)}
             ${statusBadge('Afventer', counts.afventer, STATUS_FARVER.afventer)}
             ${statusBadge('Annulleret', counts.annulleret, STATUS_FARVER.annulleret)}
             ${statusBadge('Ledig', counts.ledig, STATUS_FARVER.ledig)}
         </div>
     `;
-    container.appendChild(statusSection);
+    container.appendChild(section);
+}
 
-    // === Hal-oversigt ===
-    const halSection = document.createElement('div');
-    halSection.style.cssText = 'margin-bottom:16px';
-    halSection.innerHTML = `
+function renderHalSection(container, haller, stande) {
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-bottom:16px';
+    section.innerHTML = `
         <h4 style="margin:0 0 8px; font-size:13px; font-weight:600; color:var(--wa-color-neutral-600)">Haller</h4>
     `;
-    for (const hal of MOCK_HALLER) {
-        const stande = getStandeForHal(hal.id);
-        const optaget = stande.filter(s => s.status !== 'ledig').length;
-        const halCard = document.createElement('div');
-        halCard.style.cssText = `
+    for (const hal of haller) {
+        const halStande = getStandeForHal(stande, hal.id);
+        const optaget = halStande.filter(s => s.status !== 'ledig').length;
+        const card = document.createElement('div');
+        card.style.cssText = `
             padding:8px 10px; margin-bottom:6px; border-radius:6px;
             border-left:4px solid ${hal.farve}; background:var(--wa-color-neutral-50);
             font-size:13px;
         `;
-        halCard.innerHTML = `
+        card.innerHTML = `
             <div style="font-weight:600">${hal.navn}</div>
             <div style="color:var(--wa-color-neutral-500); font-size:11px">
-                ${stande.length} stande &middot; ${optaget} optaget &middot; ${stande.length - optaget} ledige
+                ${halStande.length} stande &middot; ${optaget} optaget &middot; ${halStande.length - optaget} ledige
             </div>
         `;
-        halSection.appendChild(halCard);
+        section.appendChild(card);
     }
-    container.appendChild(halSection);
+    container.appendChild(section);
+}
 
-    // === Stand-liste med filtrering ===
-    const standeSection = document.createElement('div');
-    standeSection.innerHTML = `
+function renderStandList(container, app, stande, udstillere) {
+    const section = document.createElement('div');
+    section.innerHTML = `
         <h4 style="margin:0 0 8px; font-size:13px; font-weight:600; color:var(--wa-color-neutral-600)">Stande</h4>
     `;
 
-    // Filter
     const filterRow = document.createElement('div');
     filterRow.style.cssText = 'display:flex; gap:6px; margin-bottom:8px';
     const filterSelect = document.createElement('wa-select');
@@ -95,29 +229,25 @@ export function renderUgPanel(container, app) {
     filterSelect.style.cssText = 'flex:1';
     filterSelect.innerHTML = `
         <wa-option value="alle">Alle</wa-option>
-        <wa-option value="bekraeftet">Bekr\u00e6ftet</wa-option>
+        <wa-option value="bekraeftet">Bekræftet</wa-option>
         <wa-option value="afventer">Afventer</wa-option>
         <wa-option value="ledig">Ledig</wa-option>
         <wa-option value="annulleret">Annulleret</wa-option>
     `;
     filterRow.appendChild(filterSelect);
-    standeSection.appendChild(filterRow);
+    section.appendChild(filterRow);
 
-    // Stand-liste container
-    const standList = document.createElement('div');
-    standList.id = 'ug-stand-list';
-    standList.style.cssText = 'max-height:300px; overflow-y:auto';
-    standeSection.appendChild(standList);
-    container.appendChild(standeSection);
+    const listContainer = document.createElement('div');
+    listContainer.style.cssText = 'max-height:300px; overflow-y:auto';
+    section.appendChild(listContainer);
+    container.appendChild(section);
 
-    function renderStandList(filter) {
-        standList.innerHTML = '';
-        const filtered = filter === 'alle'
-            ? MOCK_STANDE
-            : MOCK_STANDE.filter(s => s.status === filter);
+    function renderList(filter) {
+        listContainer.innerHTML = '';
+        const filtered = filter === 'alle' ? stande : stande.filter(s => s.status === filter);
 
         for (const stand of filtered) {
-            const udstiller = getUdstiller(stand.udstillerId);
+            const udstiller = findUdstiller(udstillere, stand.udstiller_id);
             const item = document.createElement('div');
             item.style.cssText = `
                 display:flex; align-items:center; gap:8px;
@@ -126,14 +256,12 @@ export function renderUgPanel(container, app) {
                 font-size:12px; cursor:pointer;
             `;
             item.innerHTML = `
-                <span style="width:8px; height:8px; border-radius:50%; background:${STATUS_FARVER[stand.status]}; flex-shrink:0"></span>
+                <span style="width:8px; height:8px; border-radius:50%; background:${STATUS_FARVER[stand.status] || '#999'}; flex-shrink:0"></span>
                 <span style="font-weight:600; min-width:32px">${stand.standnummer}</span>
                 <span style="flex:1; color:var(--wa-color-neutral-600); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
                     ${udstiller ? udstiller.firmanavn : 'Ledig'}
                 </span>
             `;
-
-            // Klik: find og zoom til standen paa canvas
             item.addEventListener('click', () => {
                 const standEl = app.elements.find(e =>
                     e.type === 'ug-stand' && e.external?.data?.standnummer === stand.standnummer
@@ -144,25 +272,17 @@ export function renderUgPanel(container, app) {
                     app.selectedIds = new Set([standEl.id]);
                 }
             });
-
-            standList.appendChild(item);
+            listContainer.appendChild(item);
         }
 
         if (filtered.length === 0) {
-            standList.innerHTML = '<div style="color:var(--wa-color-neutral-400); font-size:12px; padding:8px">Ingen stande med dette filter</div>';
+            listContainer.innerHTML = '<div style="color:var(--wa-color-neutral-400); font-size:12px; padding:8px">Ingen stande med dette filter</div>';
         }
     }
 
-    // Initial render
-    renderStandList('alle');
-
-    // Filter change
-    filterSelect.addEventListener('wa-change', () => {
-        renderStandList(filterSelect.value);
-    });
+    renderList('alle');
+    filterSelect.addEventListener('wa-change', () => renderList(filterSelect.value));
 }
-
-// === Hjælper-funktioner ===
 
 function statusBadge(label, count, color) {
     return `
@@ -174,9 +294,7 @@ function statusBadge(label, count, color) {
     `;
 }
 
-function showPanelToast(container, message, variant) {
-    // Brug UIManager toast hvis tilgaengelig
-    const app = window.__whiteboardApp;
+function showPanelToast(app, message, variant) {
     if (app && app.uiManager) {
         app.uiManager.showToast(message, variant);
     }

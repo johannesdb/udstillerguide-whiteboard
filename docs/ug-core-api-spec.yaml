@@ -1,0 +1,481 @@
+openapi: "3.0.3"
+
+info:
+  title: "UG Core API — Whiteboard Integration"
+  version: "1.0.0"
+  description: "API-kontrakt mellem Udstillerguide Whiteboard og UG Core"
+
+servers:
+  - url: "{baseUrl}/api/v1"
+    description: "UG Core API server"
+    variables:
+      baseUrl:
+        default: "https://ug-core.example.com"
+        description: "Base-URL for UG Core-instansen"
+
+security:
+  - apiKey: []
+
+paths:
+  /messer/{messeId}:
+    get:
+      summary: "Hent messe metadata"
+      description: "Returnerer stamdata for den angivne messe."
+      operationId: getMesse
+      tags:
+        - Messer
+      parameters:
+        - $ref: "#/components/parameters/messeId"
+      responses:
+        "200":
+          description: "Messen blev fundet."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Messe"
+        "404":
+          description: "Messen findes ikke."
+        "401":
+          description: "Manglende eller ugyldig API-noegle."
+
+  /messer/{messeId}/full:
+    get:
+      summary: "Hent komplet messe-datasaet (FullResponse)"
+      description: >
+        Returnerer alle data for en messe i et samlet kald — messe, haller, stande,
+        udstillere og taksonomier. Beregnet til initial indlaesning i Whiteboard.
+      operationId: getMesseFull
+      tags:
+        - Messer
+      parameters:
+        - $ref: "#/components/parameters/messeId"
+      responses:
+        "200":
+          description: "Komplet datasaet for messen."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullResponse"
+        "404":
+          description: "Messen findes ikke."
+        "401":
+          description: "Manglende eller ugyldig API-noegle."
+
+  /messer/{messeId}/changes:
+    get:
+      summary: "Hent inkrementelle aendringer (ChangesResponse)"
+      description: >
+        Returnerer alle entitetsaendringer (oprettet, opdateret, slettet) der er sket
+        efter det angivne tidspunkt. Bruges til inkrementel synkronisering saa
+        Whiteboard kan holde sin lokale kopi opdateret uden fuld genindlaesning.
+      operationId: getChanges
+      tags:
+        - Synkronisering
+      parameters:
+        - $ref: "#/components/parameters/messeId"
+        - name: since
+          in: query
+          required: true
+          description: "ISO 8601 tidspunkt — returnerer kun aendringer efter dette tidspunkt."
+          schema:
+            type: string
+            format: date-time
+          example: "2026-01-15T10:30:00Z"
+      responses:
+        "200":
+          description: "Liste af aendringer siden det angivne tidspunkt."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangesResponse"
+        "400":
+          description: "Ugyldigt 'since'-parameter."
+        "404":
+          description: "Messen findes ikke."
+        "401":
+          description: "Manglende eller ugyldig API-noegle."
+
+  /stande/{standId}:
+    put:
+      summary: "Opdater en stand (StandUpdate)"
+      description: >
+        Opdaterer position og/eller status for en stand. Bruges af Whiteboard naar
+        en bruger flytter eller aendrer status paa en stand i gulvplanen.
+      operationId: updateStand
+      tags:
+        - Stande
+      parameters:
+        - name: standId
+          in: path
+          required: true
+          description: "Unik ID for standen."
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StandUpdate"
+      responses:
+        "200":
+          description: "Standen blev opdateret."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stand"
+        "400":
+          description: "Ugyldig request body."
+        "404":
+          description: "Standen findes ikke."
+        "401":
+          description: "Manglende eller ugyldig API-noegle."
+
+  /taxonomier/{taxonomiId}:
+    put:
+      summary: "Opdater en taksonomi (TaxonomiUpdate)"
+      description: "Opdaterer navn og/eller parent for en eksisterende taksonomi."
+      operationId: updateTaksonomi
+      tags:
+        - Taksonomier
+      parameters:
+        - name: taxonomiId
+          in: path
+          required: true
+          description: "Unik ID for taksonomien."
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxonomiUpdate"
+      responses:
+        "200":
+          description: "Taksonomien blev opdateret."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Taxonomi"
+        "400":
+          description: "Ugyldig request body."
+        "404":
+          description: "Taksonomien findes ikke."
+        "401":
+          description: "Manglende eller ugyldig API-noegle."
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "API-noegle udstedt af UG Core til Whiteboard-integrationen."
+
+  parameters:
+    messeId:
+      name: messeId
+      in: path
+      required: true
+      description: "Unik ID for messen."
+      schema:
+        type: string
+
+  schemas:
+    Messe:
+      type: object
+      description: "En messe (udstilling/event)."
+      required:
+        - id
+        - navn
+        - dato
+        - lokation
+      properties:
+        id:
+          type: string
+          description: "Unik ID for messen."
+          example: "messe-001"
+        navn:
+          type: string
+          description: "Messens navn."
+          example: "Foodexpo 2026"
+        dato:
+          type: string
+          description: "Dato eller datointerval for messen."
+          example: "2026-03-15"
+        lokation:
+          type: string
+          description: "Lokation/venue for messen."
+          example: "MCH Messecenter Herning"
+
+    Hal:
+      type: object
+      description: "En udstillingshal inden for en messe."
+      required:
+        - id
+        - navn
+        - bredde
+        - hoejde
+        - farve
+      properties:
+        id:
+          type: string
+          description: "Unik ID for hallen."
+          example: "hal-a"
+        navn:
+          type: string
+          description: "Hallens navn."
+          example: "Hal A"
+        bredde:
+          type: number
+          description: "Hallens bredde i meter."
+          example: 100
+        hoejde:
+          type: number
+          description: "Hallens hoejde (dybde) i meter."
+          example: 80
+        farve:
+          type: string
+          description: "Hex-farvekode til visning af hallen."
+          example: "#E8F0FE"
+
+    Position:
+      type: object
+      description: "En 2D-position (x, y) i hallens koordinatsystem."
+      required:
+        - x
+        - "y"
+      properties:
+        x:
+          type: number
+          description: "X-koordinat (meter fra venstre kant)."
+          example: 10.5
+        "y":
+          type: number
+          description: "Y-koordinat (meter fra oeverste kant)."
+          example: 20.0
+
+    Stand:
+      type: object
+      description: "En messestand — en fysisk plads i en hal."
+      required:
+        - id
+        - standnummer
+        - hal_id
+        - bredde
+        - hoejde
+        - status
+        - position
+      properties:
+        id:
+          type: string
+          description: "Unik ID for standen."
+          example: "stand-a1"
+        standnummer:
+          type: string
+          description: "Standnummer synligt for udstillere."
+          example: "A-101"
+        hal_id:
+          type: string
+          description: "ID paa den hal standen tilhoerer."
+          example: "hal-a"
+        udstiller_id:
+          type: string
+          nullable: true
+          description: "ID paa den udstiller der har booket standen, eller null hvis ledig."
+          example: "udst-001"
+        bredde:
+          type: number
+          description: "Standens bredde i meter."
+          example: 6
+        hoejde:
+          type: number
+          description: "Standens hoejde (dybde) i meter."
+          example: 4
+        status:
+          type: string
+          enum:
+            - bekraeftet
+            - afventer
+            - annulleret
+            - ledig
+          description: "Standens bookingstatus."
+          example: "bekraeftet"
+        position:
+          $ref: "#/components/schemas/Position"
+
+    Udstiller:
+      type: object
+      description: "En udstiller (firma) der deltager i messen."
+      required:
+        - id
+        - firmanavn
+      properties:
+        id:
+          type: string
+          description: "Unik ID for udstilleren."
+          example: "udst-001"
+        firmanavn:
+          type: string
+          description: "Firmaets navn."
+          example: "Arla Foods A/S"
+        kontakt:
+          type: string
+          description: "Kontaktpersonens fulde navn."
+          example: "Jens Hansen"
+        email:
+          type: string
+          description: "Kontaktpersonens e-mailadresse."
+          example: "jens@arla.dk"
+
+    Taxonomi:
+      type: object
+      description: "En taksonomi-node (branche, produktkategori el.lign.) i et hierarki."
+      required:
+        - id
+        - navn
+      properties:
+        id:
+          type: string
+          description: "Unik ID for taksonomien."
+          example: "tax-food"
+        navn:
+          type: string
+          description: "Taksonomiens navn."
+          example: "Foedevarer"
+        parent:
+          type: string
+          nullable: true
+          description: "ID paa parent-taksonomien, eller null hvis rod-niveau."
+          example: null
+        children:
+          type: array
+          items:
+            type: string
+          description: "Liste af ID'er paa boern-taksonomier."
+          example: ["tax-dairy", "tax-meat"]
+
+    FullResponse:
+      type: object
+      description: >
+        Komplet datasaet for en messe — bruges til initial indlaesning i Whiteboard.
+      required:
+        - messe
+        - haller
+        - stande
+        - udstillere
+        - taxonomier
+        - version
+      properties:
+        messe:
+          $ref: "#/components/schemas/Messe"
+        haller:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hal"
+        stande:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stand"
+        udstillere:
+          type: array
+          items:
+            $ref: "#/components/schemas/Udstiller"
+        taxonomier:
+          type: array
+          items:
+            $ref: "#/components/schemas/Taxonomi"
+        version:
+          type: string
+          format: date-time
+          description: "Tidsstempel for dette snapshot — bruges som 'since' ved naeeste poll."
+          example: "2026-02-12T14:30:00Z"
+
+    Change:
+      type: object
+      description: "En enkelt aendring paa en entitet."
+      required:
+        - entity_type
+        - entity_id
+        - action
+        - data
+        - changed_at
+      properties:
+        entity_type:
+          type: string
+          enum:
+            - stand
+            - hal
+            - udstiller
+            - taxonomi
+          description: "Typen af den aendrede entitet."
+          example: "stand"
+        entity_id:
+          type: string
+          description: "ID paa den aendrede entitet."
+          example: "stand-a1"
+        action:
+          type: string
+          enum:
+            - created
+            - updated
+            - deleted
+          description: "Hvilken handling der er foretaget."
+          example: "updated"
+        data:
+          type: object
+          description: >
+            Entitetens aktuelle data (fuldt objekt ved created/updated, tomt ved deleted).
+          example: {"position": {"x": 15, "y": 25}, "status": "bekraeftet"}
+        changed_at:
+          type: string
+          format: date-time
+          description: "Tidspunkt for aendringen."
+          example: "2026-02-12T14:35:00Z"
+
+    ChangesResponse:
+      type: object
+      description: "Svar fra changes-endpointet med liste af aendringer og nyt versionstidsstempel."
+      required:
+        - changes
+        - version
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+        version:
+          type: string
+          format: date-time
+          description: "Nyt versionstidsstempel — brug som 'since' ved naeeste poll."
+          example: "2026-02-12T14:35:00Z"
+
+    StandUpdate:
+      type: object
+      description: "Payload til opdatering af en stand fra Whiteboard."
+      properties:
+        position:
+          $ref: "#/components/schemas/Position"
+        status:
+          type: string
+          enum:
+            - bekraeftet
+            - afventer
+            - annulleret
+            - ledig
+          description: "Ny status for standen."
+
+    TaxonomiUpdate:
+      type: object
+      description: "Payload til opdatering af en taksonomi."
+      properties:
+        navn:
+          type: string
+          description: "Taksonomiens navn."
+          example: "Mejeriprodukter"
+        parent:
+          type: string
+          nullable: true
+          description: "ID paa parent-taksonomien, eller null for rod-niveau."
+          example: "tax-food"

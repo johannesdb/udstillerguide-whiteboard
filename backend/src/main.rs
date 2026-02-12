@@ -3,6 +3,7 @@ mod auth;
 mod config;
 mod db;
 mod errors;
+mod ug_integration;
 mod ws;
 
 use std::collections::HashMap;
@@ -65,6 +66,9 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Clone pool for background sync before moving into AppState
+    let sync_pool = pool.clone();
+
     // Create shared state
     let state = Arc::new(AppState {
         pool,
@@ -73,6 +77,9 @@ async fn main() -> anyhow::Result<()> {
         oauth_client,
         oauth_pending: std::sync::Mutex::new(HashMap::new()),
     });
+
+    // Spawn background UG sync loop
+    ug_integration::sync_loop::spawn_sync_loop(sync_pool);
 
     // CORS configuration
     let cors = CorsLayer::new()
@@ -146,6 +153,23 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/boards/:id/images",
             post(api::images::upload_image),
+        )
+        // UG integration routes
+        .route(
+            "/api/boards/:id/ug/connect",
+            post(ug_integration::handlers::connect).delete(ug_integration::handlers::disconnect),
+        )
+        .route(
+            "/api/boards/:id/ug/status",
+            get(ug_integration::handlers::status),
+        )
+        .route(
+            "/api/boards/:id/ug/sync",
+            post(ug_integration::handlers::sync),
+        )
+        .route(
+            "/api/boards/:id/ug/push",
+            post(ug_integration::handlers::push),
         )
         .layer(middleware::from_fn(auth::middleware::auth_middleware))
         .layer(inject_secret);
