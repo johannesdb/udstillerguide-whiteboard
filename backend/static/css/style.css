@@ -103,8 +103,6 @@ html, body {
 #fill-picker {
     position: fixed;
     left: 64px;
-    top: 50%;
-    transform: translateY(-50%);
     background: var(--toolbar-bg);
     border-radius: 12px;
     padding: 12px;
@@ -131,8 +129,6 @@ html, body {
 #stroke-picker {
     position: fixed;
     left: 64px;
-    top: 50%;
-    transform: translateY(-50%);
     background: var(--toolbar-bg);
     border-radius: 12px;
     padding: 8px 12px;

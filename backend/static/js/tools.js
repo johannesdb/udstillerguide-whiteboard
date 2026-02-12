@@ -118,6 +118,12 @@ export class ToolManager {
                         if (!el) continue;
                         if (id === targetId) {
                             el.classList.toggle('visible');
+                            // Position picker next to the clicked button
+                            if (el.classList.contains('visible')) {
+                                const btnRect = btn.getBoundingClientRect();
+                                el.style.top = btnRect.top + 'px';
+                                el.style.transform = 'none';
+                            }
                         } else {
                             el.classList.remove('visible');
                         }
@@ -135,10 +141,9 @@ export class ToolManager {
                 const color = e.target.value;
                 this.app.currentColor = color;
 
-                const colorBtn = document.querySelector('[data-tool="color"] svg circle');
-                if (colorBtn) {
-                    colorBtn.setAttribute('fill', color);
-                    colorBtn.setAttribute('stroke', color);
+                const colorIcon = document.querySelector('[data-tool="color"] wa-icon');
+                if (colorIcon) {
+                    colorIcon.style.color = color;
                 }
 
                 for (const id of this.app.selectedIds) {
@@ -177,7 +182,7 @@ export class ToolManager {
         const strokeRange = document.getElementById('stroke-range');
         const strokeValue = document.getElementById('stroke-value');
         if (strokeRange) {
-            strokeRange.addEventListener('wa-input', () => {
+            const onStrokeChange = () => {
                 const val = parseInt(strokeRange.value);
                 strokeValue.textContent = val;
                 this.app.currentStrokeWidth = val;
@@ -187,7 +192,10 @@ export class ToolManager {
                         this.app.updateElement(id, { strokeWidth: val });
                     }
                 }
-            });
+            };
+            strokeRange.addEventListener('wa-input', onStrokeChange);
+            strokeRange.addEventListener('wa-change', onStrokeChange);
+            strokeRange.addEventListener('input', onStrokeChange);
         }
 
         // Undo/Redo buttons
