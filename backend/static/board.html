@@ -292,7 +292,8 @@
 
     <script type="module">
         // Import UG plugin BEFORE WhiteboardApp so element types are registered
-        import '/js/plugins/ug-plugin.js?v=4';
+        // Use dynamic import so a missing plugin doesn't block the entire app
+        try { await import('/js/plugins/ug-plugin.js?v=4'); } catch (e) { console.warn('UG plugin not available:', e.message); }
         import { WhiteboardApp } from '/js/canvas.js?v=4';
 
         const params = new URLSearchParams(window.location.search);
