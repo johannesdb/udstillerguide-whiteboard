@@ -267,10 +267,16 @@ export class UIManager {
         const canvas = this.app.canvas;
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             this.showContextMenu(e);
         });
-        document.addEventListener('click', () => this._hideContextMenu());
-        document.addEventListener('contextmenu', () => this._hideContextMenu());
+        // Close on any click outside the menu
+        document.addEventListener('mousedown', (e) => {
+            const menu = document.getElementById('context-menu');
+            if (menu && menu.style.display !== 'none' && !menu.contains(e.target)) {
+                this._hideContextMenu();
+            }
+        });
     }
 
     showContextMenu(e) {
