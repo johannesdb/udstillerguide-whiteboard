@@ -12,7 +12,10 @@ pub struct UgClient {
 impl UgClient {
     pub fn new(base_url: &str, api_key: &str) -> Self {
         Self {
-            http: Client::new(),
+            http: Client::builder()
+                .timeout(std::time::Duration::from_secs(15))
+                .build()
+                .expect("Failed to build HTTP client"),
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key: api_key.to_string(),
         }
@@ -43,9 +46,10 @@ impl UgClient {
     }
 
     pub async fn get_changes(&self, messe_id: &str, since: &str) -> Result<UgChangesResponse> {
-        let url = format!("{}/api/v1/messer/{}/changes?since={}", self.base_url, messe_id, since);
+        let url = format!("{}/api/v1/messer/{}/changes", self.base_url, messe_id);
         let resp = self.http.get(&url)
             .header("X-API-Key", &self.api_key)
+            .query(&[("since", since)])
             .send().await
             .context("Failed to reach UG Core /changes")?;
         if !resp.status().is_success() {

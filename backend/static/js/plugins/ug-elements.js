@@ -2,7 +2,7 @@
 // Render og hitTest funktioner der integreres via WhiteboardPlugins
 // draw(ctx, el, app) - app is the WhiteboardApp instance (provides app.camera)
 
-import { STATUS_FARVER } from './ug-mock-data.js';
+import { STATUS_FARVER } from './ug-api.js?v=4';
 
 // === ug-hal: Hal/container ===
 

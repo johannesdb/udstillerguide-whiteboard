@@ -3,7 +3,7 @@
 
 import { generateId, createConnector } from '/js/canvas.js?v=4';
 import { STATUS_FARVER, findUdstiller, getStandeForHal } from './ug-api.js?v=4';
-import { UG_ELEMENT_TYPES } from './ug-elements.js';
+import { UG_ELEMENT_TYPES } from './ug-elements.js?v=4';
 
 // === Gulvplan (View 1) ===
 

@@ -329,7 +329,7 @@ pub async fn sync(
 }
 
 /// POST /api/boards/:id/ug/push
-/// Any board member. Pushes local changes back to UG Core.
+/// Owner/admin only. Pushes local changes back to UG Core.
 pub async fn push(
     State(state): State<Arc<AppState>>,
     Path(board_id): Path<Uuid>,
@@ -346,16 +346,32 @@ pub async fn push(
         }
     };
 
-    // Any board member
-    match db::boards::user_has_access(&state.pool, board_id, claims.sub).await {
-        Ok(Some(_)) => {}
-        _ => {
+    // Owner/admin only
+    let role = match db::boards::user_has_access(&state.pool, board_id, claims.sub).await {
+        Ok(Some(r)) => r,
+        Ok(None) => {
             return (
                 StatusCode::FORBIDDEN,
                 Json(serde_json::json!({"error": "No access to this board"})),
             )
                 .into_response()
         }
+        Err(e) => {
+            tracing::error!("DB error checking access: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal error"})),
+            )
+                .into_response();
+        }
+    };
+
+    if role != "owner" && role != "admin" {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "Only board owner or admin can push to UG Core"})),
+        )
+            .into_response();
     }
 
     // Get connection

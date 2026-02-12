@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct UgConnection {
     pub board_id: Uuid,
     pub ug_base_url: String,
+    #[serde(skip_serializing)]
     pub api_key: String,
     pub messe_id: String,
     pub last_synced: Option<DateTime<Utc>>,

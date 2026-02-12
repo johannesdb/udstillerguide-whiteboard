@@ -66,6 +66,8 @@ async fn sync_single_board(
         return Ok(());
     }
 
-    db::ug_connections::update_last_synced(pool, conn.board_id).await?;
+    // NOTE: Do not advance last_synced until changes are actually applied to the board.
+    // The TODO above for applying changes via Yjs doc must be implemented first.
+    // Once applied, uncomment: db::ug_connections::update_last_synced(pool, conn.board_id).await?;
     Ok(())
 }

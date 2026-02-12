@@ -7,7 +7,7 @@ import {
 } from './ug-api.js?v=4';
 import { importMesseData } from './ug-layout.js?v=4';
 
-export function renderUgPanel(container, app) {
+export function renderUgPanel(container, app, cachedData = null) {
     container.innerHTML = '<div style="padding:8px; color:var(--wa-color-neutral-500); font-size:12px">Indlæser...</div>';
 
     const boardId = app.boardId;
@@ -19,7 +19,7 @@ export function renderUgPanel(container, app) {
     getUgStatus(boardId)
         .then(status => {
             if (status.connected) {
-                renderConnectedPanel(container, app, status);
+                renderConnectedPanel(container, app, status, cachedData);
             } else {
                 renderConnectForm(container, app);
             }
@@ -83,7 +83,7 @@ function renderConnectForm(container, app) {
             const data = await connectUg(app.boardId, url, key, messeId);
             const count = importMesseData(app, data);
             showPanelToast(app, `Forbundet! ${count} elementer importeret`, 'success');
-            renderUgPanel(container, app);
+            renderUgPanel(container, app, data);
         } catch (error) {
             showPanelToast(app, `Fejl: ${error.message}`, 'danger');
         } finally {
@@ -95,7 +95,7 @@ function renderConnectForm(container, app) {
     container.appendChild(section);
 }
 
-function renderConnectedPanel(container, app, status) {
+function renderConnectedPanel(container, app, status, cachedData = null) {
     container.innerHTML = '';
 
     const header = document.createElement('div');
@@ -129,7 +129,7 @@ function renderConnectedPanel(container, app, status) {
             } else if (data.changes) {
                 showPanelToast(app, `${data.changes.length} ændringer hentet`, 'success');
             }
-            renderUgPanel(container, app);
+            renderUgPanel(container, app, data);
         } catch (error) {
             showPanelToast(app, `Sync fejl: ${error.message}`, 'danger');
         } finally {
@@ -154,12 +154,12 @@ function renderConnectedPanel(container, app, status) {
     btnRow.appendChild(disconnectBtn);
     container.appendChild(btnRow);
 
-    renderLiveDataOverview(container, app);
+    renderLiveDataOverview(container, app, cachedData);
 }
 
-async function renderLiveDataOverview(container, app) {
+async function renderLiveDataOverview(container, app, cachedData = null) {
     try {
-        const data = await syncUg(app.boardId);
+        const data = cachedData || await syncUg(app.boardId);
         if (data.haller && data.stande) {
             renderStatusSection(container, data.stande);
             renderHalSection(container, data.haller, data.stande);

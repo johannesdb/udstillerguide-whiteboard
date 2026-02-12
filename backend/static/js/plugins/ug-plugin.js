@@ -2,7 +2,7 @@
 // Registrerer element-typer, panel og tools for Udstillerguide
 
 import { WhiteboardPlugins } from '/js/plugins.js?v=4';
-import { UG_ELEMENT_TYPES } from './ug-elements.js';
+import { UG_ELEMENT_TYPES } from './ug-elements.js?v=4';
 import { importMesseData } from './ug-layout.js?v=4';
 import { renderUgPanel } from './ug-panel.js?v=4';
 import { syncUg } from './ug-api.js?v=4';
