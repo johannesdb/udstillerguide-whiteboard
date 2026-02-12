@@ -60,10 +60,7 @@ html, body {
     box-shadow: var(--shadow-lg);
 }
 
-/* Web Awesome tooltips inside toolbar */
-#toolbar wa-tooltip {
-    display: contents;
-}
+/* WA Pro 3 tooltips use for= attribute, no wrapper needed */
 
 .tool-btn {
     width: 40px;
@@ -159,8 +156,8 @@ html, body {
     font-size: 11px;
 }
 
-/* Style wa-range in the dark panel */
-#stroke-picker wa-range {
+/* Style wa-slider in the dark panel */
+#stroke-picker wa-slider {
     --wa-color-primary-600: var(--selection-blue);
     --track-color-active: var(--selection-blue);
 }
@@ -183,10 +180,7 @@ html, body {
     font-size: 13px;
 }
 
-/* Web Awesome tooltips in top bar */
-#top-bar wa-tooltip {
-    display: contents;
-}
+/* WA Pro 3 tooltips in top bar use for= attribute */
 
 #board-name {
     font-weight: 600;
@@ -299,7 +293,7 @@ html, body {
     z-index: 9999;
 }
 
-#context-menu wa-menu {
+#context-menu [role="menu"] {
     min-width: 180px;
 }
 
@@ -329,7 +323,7 @@ html, body {
     pointer-events: none;
 }
 
-#wa-toast-stack wa-alert {
+#wa-toast-stack wa-callout {
     pointer-events: auto;
 }
 

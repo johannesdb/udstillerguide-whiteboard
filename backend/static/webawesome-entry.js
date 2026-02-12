@@ -1,8 +1,8 @@
 // Entry point for esbuild bundling of Web Awesome Pro 3
 // Bundle everything into a single file - no autoloading needed
-
-// Core loader (registers autoloader, utilities, etc.)
-import './node_modules/@awesome.me/webawesome-pro/dist/webawesome.loader.js';
+// NOTE: webawesome.loader.js is intentionally NOT imported to prevent
+// the autoloader from fetching individual component files (which don't exist
+// since everything is bundled here).
 
 // Import all components used in the whiteboard app
 // wa-alert renamed to wa-callout in WA Pro 3
