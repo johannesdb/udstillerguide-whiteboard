@@ -142,7 +142,7 @@ html, body {
     padding: 12px;
     display: none;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     z-index: 99;
     box-shadow: var(--shadow-lg);
 }
@@ -154,6 +154,7 @@ html, body {
 #stroke-picker label {
     color: var(--toolbar-text);
     font-size: 15px;
+    margin-bottom: -4px;
 }
 
 /* Style wa-slider in the dark panel */
