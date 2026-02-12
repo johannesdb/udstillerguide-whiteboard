@@ -1289,16 +1289,21 @@ export class WhiteboardApp {
 
             if (cursor.username) {
                 const fontSize = 11;
+                const pad = 4;
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 const textW = ctx.measureText(cursor.username).width;
                 const labelX = s.x + 12;
                 const labelY = s.y + 14;
+                const boxW = textW + pad * 2;
+                const boxH = fontSize + pad * 2;
                 ctx.fillStyle = cursor.color || '#F44336';
                 ctx.beginPath();
-                ctx.roundRect(labelX - 2, labelY - 2, textW + 8, fontSize + 6, 3);
+                ctx.roundRect(labelX, labelY, boxW, boxH, 3);
                 ctx.fill();
                 ctx.fillStyle = 'white';
-                ctx.fillText(cursor.username, labelX + 2, labelY + fontSize - 1);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(cursor.username, labelX + pad, labelY + boxH / 2);
+                ctx.textBaseline = 'alphabetic';
             }
         }
     }
