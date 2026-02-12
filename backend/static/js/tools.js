@@ -7,6 +7,7 @@ import {
     hitTest, hitTestResizeHandle,
 } from '/js/canvas.js?v=3';
 import { WhiteboardPlugins } from '/js/plugins.js?v=3';
+import { errorHandler } from '/js/error-handler.js?v=3';
 
 const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'hexagon']);
 const LINE_TOOLS = new Set(['line', 'arrow']);
@@ -109,36 +110,39 @@ export class ToolManager {
 
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const tool = btn.dataset.tool;
-                if (!tool) return;
-                if (pickerIds[tool]) {
-                    const targetId = pickerIds[tool];
-                    for (const id of allPickerIds) {
-                        const el = document.getElementById(id);
-                        if (!el) continue;
-                        if (id === targetId) {
-                            el.classList.toggle('visible');
-                            // Position picker next to the clicked button
-                            if (el.classList.contains('visible')) {
-                                const btnRect = btn.getBoundingClientRect();
-                                // First place it, then measure and clamp to viewport
-                                el.style.top = btnRect.top + 'px';
-                                el.style.bottom = 'auto';
-                                requestAnimationFrame(() => {
-                                    const elRect = el.getBoundingClientRect();
-                                    if (elRect.bottom > window.innerHeight - 8) {
-                                        el.style.top = 'auto';
-                                        el.style.bottom = '8px';
-                                    }
-                                });
+                try {
+                    const tool = btn.dataset.tool;
+                    if (!tool) return;
+                    if (pickerIds[tool]) {
+                        const targetId = pickerIds[tool];
+                        for (const id of allPickerIds) {
+                            const el = document.getElementById(id);
+                            if (!el) continue;
+                            if (id === targetId) {
+                                el.classList.toggle('visible');
+                                // Position picker next to the clicked button
+                                if (el.classList.contains('visible')) {
+                                    const btnRect = btn.getBoundingClientRect();
+                                    el.style.top = btnRect.top + 'px';
+                                    el.style.bottom = 'auto';
+                                    requestAnimationFrame(() => {
+                                        const elRect = el.getBoundingClientRect();
+                                        if (elRect.bottom > window.innerHeight - 8) {
+                                            el.style.top = 'auto';
+                                            el.style.bottom = '8px';
+                                        }
+                                    });
+                                }
+                            } else {
+                                el.classList.remove('visible');
                             }
-                        } else {
-                            el.classList.remove('visible');
                         }
+                        return;
                     }
-                    return;
+                    this.setTool(tool);
+                } catch (err) {
+                    errorHandler.report({ error_type: 'toolbar', severity: 'error', message: err.message, stack_trace: err.stack });
                 }
-                this.setTool(tool);
             });
         });
 
@@ -146,20 +150,24 @@ export class ToolManager {
         const strokePicker = document.getElementById('stroke-color-wa');
         if (strokePicker) {
             strokePicker.addEventListener('wa-input', (e) => {
-                const color = e.target.value;
-                this.app.currentColor = color;
+                try {
+                    const color = e.target.value;
+                    this.app.currentColor = color;
 
-                const colorIcon = document.querySelector('[data-tool="color"] wa-icon');
-                if (colorIcon) {
-                    colorIcon.style.color = color;
-                }
-
-                for (const id of this.app.selectedIds) {
-                    const el = this.app.getElementById(id);
-                    if (el) {
-                        this.app.updateElement(id, { color });
-                        if (el.type === 'sticky') this.app.stickyColor = color;
+                    const colorIcon = document.querySelector('[data-tool="color"] wa-icon');
+                    if (colorIcon) {
+                        colorIcon.style.color = color;
                     }
+
+                    for (const id of this.app.selectedIds) {
+                        const el = this.app.getElementById(id);
+                        if (el) {
+                            this.app.updateElement(id, { color });
+                            if (el.type === 'sticky') this.app.stickyColor = color;
+                        }
+                    }
+                } catch (err) {
+                    errorHandler.report({ error_type: 'color-picker', severity: 'error', message: err.message, stack_trace: err.stack });
                 }
             });
             strokePicker.addEventListener('wa-change', () => {
@@ -171,14 +179,18 @@ export class ToolManager {
         const fillPicker = document.getElementById('fill-color-wa');
         if (fillPicker) {
             fillPicker.addEventListener('wa-input', (e) => {
-                const fill = e.target.value;
-                this.app.currentFill = fill;
+                try {
+                    const fill = e.target.value;
+                    this.app.currentFill = fill;
 
-                for (const id of this.app.selectedIds) {
-                    const el = this.app.getElementById(id);
-                    if (el && el.fill !== undefined) {
-                        this.app.updateElement(id, { fill });
+                    for (const id of this.app.selectedIds) {
+                        const el = this.app.getElementById(id);
+                        if (el && el.fill !== undefined) {
+                            this.app.updateElement(id, { fill });
+                        }
                     }
+                } catch (err) {
+                    errorHandler.report({ error_type: 'fill-picker', severity: 'error', message: err.message, stack_trace: err.stack });
                 }
             });
             fillPicker.addEventListener('wa-change', () => {
@@ -191,14 +203,19 @@ export class ToolManager {
         const strokeValue = document.getElementById('stroke-value');
         if (strokeRange) {
             const onStrokeChange = () => {
-                const val = parseInt(strokeRange.value);
-                strokeValue.textContent = val;
-                this.app.currentStrokeWidth = val;
-                for (const id of this.app.selectedIds) {
-                    const el = this.app.getElementById(id);
-                    if (el && el.strokeWidth !== undefined) {
-                        this.app.updateElement(id, { strokeWidth: val });
+                try {
+                    const val = parseInt(strokeRange.value, 10);
+                    if (isNaN(val)) return;
+                    strokeValue.textContent = val;
+                    this.app.currentStrokeWidth = val;
+                    for (const id of this.app.selectedIds) {
+                        const el = this.app.getElementById(id);
+                        if (el && el.strokeWidth !== undefined) {
+                            this.app.updateElement(id, { strokeWidth: val });
+                        }
                     }
+                } catch (err) {
+                    errorHandler.report({ error_type: 'stroke-picker', severity: 'error', message: err.message, stack_trace: err.stack });
                 }
             };
             strokeRange.addEventListener('wa-input', onStrokeChange);
@@ -233,11 +250,11 @@ export class ToolManager {
             }
         });
 
-        canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-        canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
-        canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
-        canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+        canvas.addEventListener('mousedown', (e) => { try { this.onMouseDown(e); } catch (err) { errorHandler.report({ error_type: 'canvas', severity: 'error', message: err.message, stack_trace: err.stack }); } });
+        canvas.addEventListener('mousemove', (e) => { try { this.onMouseMove(e); } catch (err) { errorHandler.report({ error_type: 'canvas', severity: 'error', message: err.message, stack_trace: err.stack }); } });
+        canvas.addEventListener('mouseup', (e) => { try { this.onMouseUp(e); } catch (err) { errorHandler.report({ error_type: 'canvas', severity: 'error', message: err.message, stack_trace: err.stack }); } });
+        canvas.addEventListener('dblclick', (e) => { try { this.onDoubleClick(e); } catch (err) { errorHandler.report({ error_type: 'canvas', severity: 'error', message: err.message, stack_trace: err.stack }); } });
+        canvas.addEventListener('wheel', (e) => { try { this.onWheel(e); } catch (err) { errorHandler.report({ error_type: 'canvas', severity: 'error', message: err.message, stack_trace: err.stack }); } }, { passive: false });
     }
 
     onMouseDown(e) {
