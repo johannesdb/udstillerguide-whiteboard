@@ -121,8 +121,16 @@ export class ToolManager {
                             // Position picker next to the clicked button
                             if (el.classList.contains('visible')) {
                                 const btnRect = btn.getBoundingClientRect();
+                                // First place it, then measure and clamp to viewport
                                 el.style.top = btnRect.top + 'px';
-                                el.style.transform = 'none';
+                                el.style.bottom = 'auto';
+                                requestAnimationFrame(() => {
+                                    const elRect = el.getBoundingClientRect();
+                                    if (elRect.bottom > window.innerHeight - 8) {
+                                        el.style.top = 'auto';
+                                        el.style.bottom = '8px';
+                                    }
+                                });
                             }
                         } else {
                             el.classList.remove('visible');

@@ -123,6 +123,9 @@ html, body {
 #fill-picker wa-color-picker {
     --wa-input-border-color: #555;
     --wa-color-neutral-0: var(--toolbar-bg);
+    --wa-input-color: #fff;
+    --wa-color-neutral-700: #ccc;
+    color: #fff;
 }
 
 /* === Stroke Width Picker === */
