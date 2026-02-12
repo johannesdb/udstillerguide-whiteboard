@@ -42,6 +42,12 @@
 - Alle fejl SKAL logges til error_log tabellen med fuld kontekst
 - Kritiske fejl (severity: critical) SKAL oprette en Beads task automatisk
 
+## Playwright / Browser Testing
+
+- Playwright SKAL altid køre i **headless mode** som standard (`headless: true`)
+- Headed mode kun hvis brugeren eksplicit beder om at se browseren
+- Brug trace viewer (`context.tracing`) til debugging fremfor headed mode
+
 ## Deploy
 
 - Deploy-script: `bash deploy.sh` (pusher til origin, SSH'er til server, puller og rebuilder Docker)
