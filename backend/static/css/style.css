@@ -125,15 +125,11 @@ html, body {
     --wa-color-neutral-0: var(--toolbar-bg);
     --wa-input-color: #fff;
     --wa-color-neutral-700: #ccc;
-    --wa-input-label-color: #fff;
-    --wa-color-neutral-500: #aaa;
     color: #fff;
 }
 
-#color-picker wa-color-picker::part(base),
-#fill-picker wa-color-picker::part(base),
-#color-picker wa-color-picker::part(trigger),
-#fill-picker wa-color-picker::part(trigger) {
+#color-picker wa-color-picker::part(form-control-label),
+#fill-picker wa-color-picker::part(form-control-label) {
     color: #fff;
 }
 
