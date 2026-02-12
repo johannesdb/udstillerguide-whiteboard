@@ -102,7 +102,7 @@ html, body {
 #color-picker,
 #fill-picker {
     position: fixed;
-    left: 64px;
+    left: 72px;
     background: var(--toolbar-bg);
     border-radius: 12px;
     padding: 12px;
@@ -131,13 +131,13 @@ html, body {
 /* === Stroke Width Picker === */
 #stroke-picker {
     position: fixed;
-    left: 64px;
+    left: 72px;
     background: var(--toolbar-bg);
     border-radius: 12px;
-    padding: 8px 12px;
+    padding: 12px;
     display: none;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     z-index: 99;
     box-shadow: var(--shadow-lg);
 }
@@ -148,7 +148,7 @@ html, body {
 
 #stroke-picker label {
     color: var(--toolbar-text);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 /* Style wa-slider in the dark panel */
