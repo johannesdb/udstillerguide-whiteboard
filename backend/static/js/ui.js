@@ -269,6 +269,8 @@ export class UIManager {
             e.preventDefault();
             this.showContextMenu(e);
         });
+        document.addEventListener('click', () => this._hideContextMenu());
+        document.addEventListener('contextmenu', () => this._hideContextMenu());
     }
 
     showContextMenu(e) {
@@ -286,18 +288,14 @@ export class UIManager {
 
             for (const item of items) {
                 if (item === 'divider') {
-                    menu.appendChild(document.createElement('wa-divider'));
+                    const divider = document.createElement('div');
+                    divider.className = 'ctx-divider';
+                    menu.appendChild(divider);
                     continue;
                 }
-                const menuItem = document.createElement('wa-dropdown-item');
+                const menuItem = document.createElement('div');
+                menuItem.className = 'ctx-item';
                 menuItem.textContent = item.label;
-                if (item.icon) {
-                    const icon = document.createElement('wa-icon');
-                    icon.slot = 'prefix';
-                    icon.name = item.icon;
-                    icon.variant = 'regular';
-                    menuItem.prepend(icon);
-                }
                 menuItem.addEventListener('click', () => {
                     item.action();
                     this._hideContextMenu();
@@ -305,11 +303,10 @@ export class UIManager {
                 menu.appendChild(menuItem);
             }
 
-            // Position and show the dropdown
-            const dropdown = document.getElementById('context-menu');
-            dropdown.style.left = e.clientX + 'px';
-            dropdown.style.top = e.clientY + 'px';
-            dropdown.open = true;
+            const container = document.getElementById('context-menu');
+            container.style.left = e.clientX + 'px';
+            container.style.top = e.clientY + 'px';
+            container.style.display = 'block';
         } catch (error) {
             console.error('Context menu error:', error);
         }
@@ -341,8 +338,8 @@ export class UIManager {
     }
 
     _hideContextMenu() {
-        const dropdown = document.getElementById('context-menu');
-        if (dropdown) dropdown.open = false;
+        const container = document.getElementById('context-menu');
+        if (container) container.style.display = 'none';
     }
 
     _cutSelected() {

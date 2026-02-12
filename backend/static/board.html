@@ -281,13 +281,12 @@
         <wa-button slot="footer" variant="neutral" id="btn-close-share">Close</wa-button>
     </wa-dialog>
 
-    <!-- Context menu - Web Awesome -->
-    <wa-dropdown id="context-menu" placement="bottom-start" hoist style="position:fixed; z-index:9999">
-        <div slot="trigger" style="display:none"></div>
+    <!-- Context menu -->
+    <div id="context-menu" style="display:none; position:fixed; z-index:9999;">
         <div id="context-menu-items" role="menu">
             <!-- Items populated dynamically -->
         </div>
-    </wa-dropdown>
+    </div>
 
     <!-- Plugin sidebar - Web Awesome Drawer -->
     <wa-drawer id="plugin-sidebar" placement="end" no-header style="--size: 320px;">
