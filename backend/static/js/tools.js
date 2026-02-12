@@ -218,6 +218,8 @@ export class ToolManager {
                     errorHandler.report({ error_type: 'stroke-picker', severity: 'error', message: err.message, stack_trace: err.stack });
                 }
             };
+            // wa-input fires on drag, wa-change on release, input is native fallback
+            // — all three needed because wa-slider behaviour varies across browsers
             strokeRange.addEventListener('wa-input', onStrokeChange);
             strokeRange.addEventListener('wa-change', onStrokeChange);
             strokeRange.addEventListener('input', onStrokeChange);

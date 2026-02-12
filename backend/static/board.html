@@ -19,25 +19,17 @@
     <!-- Top bar -->
     <div id="top-bar">
         <button class="top-btn" id="btn-back">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
+            <wa-icon name="arrow-left" family="sharp" variant="solid"></wa-icon>
         </button>
         <wa-tooltip for="btn-back" placement="bottom">Back to dashboard</wa-tooltip>
         <span id="board-name">Untitled Board</span>
         <span id="zoom-level">100%</span>
         <button class="top-btn" id="btn-undo">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 10h10a5 5 0 0 1 0 10H9"/>
-                <path d="M3 10l4-4M3 10l4 4"/>
-            </svg>
+            <wa-icon name="rotate-left" family="sharp" variant="solid"></wa-icon>
         </button>
         <wa-tooltip for="btn-undo" placement="bottom">Undo (Ctrl+Z)</wa-tooltip>
         <button class="top-btn" id="btn-redo">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10H11a5 5 0 0 0 0 10h4"/>
-                <path d="M21 10l-4-4M21 10l-4 4"/>
-            </svg>
+            <wa-icon name="rotate-right" family="sharp" variant="solid"></wa-icon>
         </button>
         <wa-tooltip for="btn-redo" placement="bottom">Redo (Ctrl+Shift+Z)</wa-tooltip>
         <button class="top-btn" id="btn-share">Share</button>
@@ -299,6 +291,8 @@
     </div>
 
     <script type="module">
+        // Import UG plugin BEFORE WhiteboardApp so element types are registered
+        import '/js/plugins/ug-plugin.js';
         import { WhiteboardApp } from '/js/canvas.js?v=3';
 
         const params = new URLSearchParams(window.location.search);

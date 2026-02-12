@@ -305,6 +305,16 @@ html, body {
     cursor: pointer;
     color: #333;
     transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ctx-item wa-icon {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+    color: #666;
 }
 
 .ctx-item:hover {

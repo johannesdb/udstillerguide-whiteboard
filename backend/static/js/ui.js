@@ -47,10 +47,7 @@ export class UIManager {
             toggleBtn.className = 'top-btn';
             toggleBtn.id = 'btn-sidebar-toggle';
             toggleBtn.title = 'Toggle Sidebar';
-            toggleBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="15" y1="3" x2="15" y2="21"/>
-        </svg>`;
+            toggleBtn.innerHTML = `<wa-icon name="sidebar" family="sharp" variant="solid"></wa-icon>`;
             toggleBtn.addEventListener('click', () => this.toggleSidebar());
             topBar.appendChild(toggleBtn);
         }
@@ -301,7 +298,16 @@ export class UIManager {
                 }
                 const menuItem = document.createElement('div');
                 menuItem.className = 'ctx-item';
-                menuItem.textContent = item.label;
+                if (item.icon) {
+                    const icon = document.createElement('wa-icon');
+                    icon.setAttribute('name', item.icon);
+                    icon.setAttribute('family', 'sharp');
+                    icon.setAttribute('variant', 'solid');
+                    menuItem.appendChild(icon);
+                    menuItem.appendChild(document.createTextNode(item.label));
+                } else {
+                    menuItem.textContent = item.label;
+                }
                 menuItem.addEventListener('click', () => {
                     item.action();
                     this._hideContextMenu();
