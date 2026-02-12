@@ -131,7 +131,8 @@ html, body {
 #stroke-picker {
     position: fixed;
     left: 64px;
-    bottom: 80px;
+    top: 50%;
+    transform: translateY(-50%);
     background: var(--toolbar-bg);
     border-radius: 12px;
     padding: 8px 12px;
