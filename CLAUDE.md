@@ -10,6 +10,12 @@
   - Brug `<wa-button>`, `<wa-input>`, `<wa-dialog>`, `<wa-card>` osv. direkte i Askama templates
   - Styling via CSS custom properties (theming)
   - npm-pakke fra Cloudsmith registry (kræver `WEBAWESOME_NPM_TOKEN`)
+- **Font Awesome Sharp Duotone Thin** er standard ikon-stil overalt i UG
+  - Syntax: `<wa-icon name="gauge" family="sharp-duotone" variant="thin"></wa-icon>`
+  - VIGTIGT: `family="sharp-duotone-thin"` virker IKKE — brug altid `family` + `variant` separat
+  - Duotone-farver: Primary (streg/outline) = teal `--brand-primary-base` (#314F59), Secondary (fyld/fill) = coral `--brand-accent` (#E07A5F)
+  - CSS: `--primary-color`, `--secondary-color`, `--secondary-opacity: 1` på `wa-icon[family="sharp-duotone"]`
+  - Status-badges bruger `family="sharp-duotone-solid"` (fyldte ikoner)
 - **Server-side rendering** — HTML genereres i typechecked Rust-templates
 - **Ingen SPA-framework** — ingen React/Vue/Angular
 - **JavaScript kun hvor strengt nødvendigt:**
