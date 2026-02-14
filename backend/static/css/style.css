@@ -5,6 +5,14 @@
     box-sizing: border-box;
 }
 
+/* === Duotone icon — coral primary, teal secondary (UG brand) === */
+wa-icon[family="sharp-duotone"][variant="thin"] {
+    --primary-opacity: 1;
+    --primary-color: #314F59;
+    --secondary-opacity: 1;
+    --secondary-color: #E07A5F;
+}
+
 :root {
     --toolbar-bg: #2c2c2c;
     --toolbar-hover: #3c3c3c;
@@ -50,14 +58,15 @@ html, body {
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    background: var(--toolbar-bg);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 4px;
     z-index: 100;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 /* WA Pro 3 tooltips use for= attribute, no wrapper needed */
@@ -72,17 +81,17 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--toolbar-text);
+    color: #314F59;
     transition: background 0.15s, color 0.15s;
     position: relative;
 }
 
 .tool-btn:hover {
-    background: var(--toolbar-hover);
+    background: #f1f5f9;
 }
 
 .tool-btn.active {
-    background: var(--selection-blue);
+    background: #314F59;
     color: white;
 }
 
@@ -94,7 +103,7 @@ html, body {
 .tool-separator {
     width: 28px;
     height: 1px;
-    background: #555;
+    background: #e2e8f0;
     margin: 4px auto;
 }
 
@@ -103,14 +112,15 @@ html, body {
 #fill-picker {
     position: fixed;
     left: 72px;
-    background: var(--toolbar-bg);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 12px;
     display: none;
     flex-direction: column;
     gap: 4px;
     z-index: 99;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 #color-picker.visible,
@@ -118,33 +128,30 @@ html, body {
     display: flex;
 }
 
-/* Style the wa-color-picker inside the dark toolbar panels */
+/* Style the wa-color-picker inside the light toolbar panels */
 #color-picker wa-color-picker,
 #fill-picker wa-color-picker {
-    --wa-input-border-color: #555;
-    --wa-color-neutral-0: var(--toolbar-bg);
-    --wa-input-color: #fff;
-    --wa-color-neutral-700: #ccc;
-    color: #fff;
+    color: #314F59;
 }
 
 #color-picker wa-color-picker::part(form-control-label),
 #fill-picker wa-color-picker::part(form-control-label) {
-    color: #fff;
+    color: #314F59;
 }
 
 /* === Stroke Width Picker === */
 #stroke-picker {
     position: fixed;
     left: 72px;
-    background: var(--toolbar-bg);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 12px;
     display: none;
     flex-direction: column;
     gap: 12px;
     z-index: 99;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 #stroke-picker.visible {
@@ -152,7 +159,7 @@ html, body {
 }
 
 #stroke-picker label {
-    color: var(--toolbar-text);
+    color: #314F59;
     font-size: 15px;
     padding-bottom: 8px;
 }
@@ -169,15 +176,16 @@ html, body {
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--toolbar-bg);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 6px 16px;
     display: flex;
     align-items: center;
     gap: 12px;
     z-index: 100;
-    box-shadow: var(--shadow);
-    color: var(--toolbar-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    color: #314F59;
     font-size: 13px;
 }
 
@@ -201,7 +209,7 @@ html, body {
 .top-btn {
     background: transparent;
     border: none;
-    color: var(--toolbar-text);
+    color: #314F59;
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 4px;
@@ -210,7 +218,7 @@ html, body {
 }
 
 .top-btn:hover {
-    background: var(--toolbar-hover);
+    background: #f1f5f9;
 }
 
 /* === Presence Bar (Web Awesome Avatars) === */

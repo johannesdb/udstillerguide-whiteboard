@@ -23,7 +23,7 @@ WhiteboardPlugins.register('udstillerguide', {
         {
             name: 'ug-import',
             title: 'Synkroniser messe-data fra UG Core',
-            icon: '<wa-icon name="arrows-rotate" variant="sharp" family="solid" style="font-size:18px"></wa-icon>',
+            icon: '<wa-icon name="arrows-rotate" family="sharp-duotone" variant="thin" style="font-size:18px"></wa-icon>',
             cursor: 'default',
             onDown: async (world, app) => {
                 try {

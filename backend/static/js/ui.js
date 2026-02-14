@@ -47,7 +47,7 @@ export class UIManager {
             toggleBtn.className = 'top-btn';
             toggleBtn.id = 'btn-sidebar-toggle';
             toggleBtn.title = 'Toggle Sidebar';
-            toggleBtn.innerHTML = `<wa-icon name="sidebar" family="sharp" variant="solid"></wa-icon>`;
+            toggleBtn.innerHTML = `<wa-icon name="sidebar" family="sharp-duotone" variant="thin"></wa-icon>`;
             toggleBtn.addEventListener('click', () => this.toggleSidebar());
             topBar.appendChild(toggleBtn);
         }
