@@ -13,6 +13,14 @@ const SHAPE_TOOLS = new Set(['rect', 'circle', 'triangle', 'diamond', 'star', 'h
 const LINE_TOOLS = new Set(['line', 'arrow']);
 const CREATION_TOOLS = new Set(['sticky', ...SHAPE_TOOLS, 'textbox']);
 
+// Convert hex color to rgba string with alpha (theme colors are always #RRGGBB)
+function hexWithAlpha(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export class ToolManager {
     constructor(app) {
         this.app = app;
@@ -992,7 +1000,7 @@ export class ToolManager {
                 const from = cam.worldToScreen(cx, cy);
                 const to = cam.worldToScreen(this.lastMouseWorld.x, this.lastMouseWorld.y);
                 ctx.save();
-                ctx.strokeStyle = this.app.theme.selectionColor + '80';
+                ctx.strokeStyle = hexWithAlpha(this.app.theme.selectionColor, 0.5);
                 ctx.lineWidth = 2;
                 ctx.setLineDash([6, 4]);
                 ctx.beginPath();
@@ -1016,7 +1024,7 @@ export class ToolManager {
 
                     ctx.beginPath();
                     ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = isHovered ? this.app.theme.selectionColor : (this.app.theme.selectionColor + '4D');
+                    ctx.fillStyle = isHovered ? this.app.theme.selectionColor : hexWithAlpha(this.app.theme.selectionColor, 0.3);
                     ctx.fill();
                     ctx.strokeStyle = this.app.theme.selectionColor;
                     ctx.lineWidth = isHovered ? 2 : 1;
