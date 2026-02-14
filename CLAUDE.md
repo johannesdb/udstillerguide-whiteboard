@@ -13,7 +13,7 @@
 - **Font Awesome Sharp Duotone Thin** er standard ikon-stil overalt i UG
   - Syntax: `<wa-icon name="gauge" family="sharp-duotone" variant="thin"></wa-icon>`
   - VIGTIGT: `family="sharp-duotone-thin"` virker IKKE — brug altid `family` + `variant` separat
-  - Duotone-farver: Primary (streg/outline) = teal `--brand-primary-base` (#314F59), Secondary (fyld/fill) = coral `--brand-accent` (#E07A5F)
+  - Duotone-farver: Primary (streg/outline) = teal `--brand-primary-base` (#314F59), Secondary (fyld/fill) = coral `--brand-accent` (#E07A5F), opacity **altid 1** (ikke default 0.4)
   - CSS: `--primary-color`, `--secondary-color`, `--secondary-opacity: 1` på `wa-icon[family="sharp-duotone"]`
   - Status-badges bruger `family="sharp-duotone-solid"` (fyldte ikoner)
 - **Server-side rendering** — HTML genereres i typechecked Rust-templates
