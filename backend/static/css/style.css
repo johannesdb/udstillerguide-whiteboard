@@ -35,6 +35,15 @@
 }
 
 html.wa-dark {
+    /* Dark mode fallbacks (theme.css provides these when available) */
+    --toolbar-bg: var(--brand-surface, #1e2c36);
+    --toolbar-hover: var(--brand-surface-hover, #1a2830);
+    --toolbar-active: var(--brand-primary-base, #7FBEC6);
+    --toolbar-text: var(--brand-text, #d0dce4);
+    --toolbar-border: var(--brand-border, #354A56);
+    --canvas-bg: var(--brand-bg, #182028);
+    --selection-color: var(--brand-primary-base, #7FBEC6);
+    --selection-bg: color-mix(in srgb, var(--brand-primary-base, #7FBEC6) 8%, transparent);
     --shadow: 0 2px 8px rgba(0,0,0,0.3);
     --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
 }
