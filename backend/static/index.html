@@ -4,10 +4,118 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Udstillerguide Whiteboard</title>
+    <link rel="stylesheet" href="https://app.udstillerguide.dk/static/css/theme.css">
     <link rel="stylesheet" href="/css/style.css?v=4">
 </head>
 <body>
     <div id="app"></div>
+
+    <script>
+        // Theme detection — runs before module scripts to avoid FOUC
+        (function() {
+            try {
+                var saved = localStorage.getItem('ug-theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (saved === 'dark' || (!saved && prefersDark)) {
+                    document.documentElement.classList.add('wa-dark');
+                }
+            } catch (e) {
+                // localStorage may be unavailable in private browsing
+            }
+        })();
+    </script>
+
+    <script type="module">
+        // Dark mode toggle for dashboard
+        // Waits for app.js to render the dashboard, then injects toggle button
+        function initThemeToggle() {
+            try {
+                const header = document.querySelector('.dashboard-header .dashboard-actions');
+                if (!header) return false;
+
+                // Don't add twice
+                if (document.getElementById('btn-theme-dashboard')) return true;
+
+                const btn = document.createElement('button');
+                btn.className = 'btn-secondary';
+                btn.id = 'btn-theme-dashboard';
+                btn.style.cssText = 'display:inline-flex; align-items:center; gap:4px; padding:6px 10px; min-width:auto;';
+
+                const icon = document.createElement('wa-icon');
+                icon.setAttribute('family', 'sharp-duotone');
+                icon.setAttribute('variant', 'thin');
+                updateIcon(icon);
+
+                btn.appendChild(icon);
+                // Insert before the logout button
+                const logoutBtn = document.getElementById('btn-logout');
+                if (logoutBtn) {
+                    header.insertBefore(btn, logoutBtn);
+                } else {
+                    header.appendChild(btn);
+                }
+
+                btn.addEventListener('click', () => {
+                    try {
+                        const isDark = document.documentElement.classList.toggle('wa-dark');
+                        localStorage.setItem('ug-theme', isDark ? 'dark' : 'light');
+                        updateIcon(icon);
+                        document.dispatchEvent(new CustomEvent('theme-change'));
+                    } catch (e) {
+                        console.error('Theme toggle failed:', e);
+                    }
+                });
+
+                return true;
+            } catch (e) {
+                console.error('Theme toggle init failed:', e);
+                return false;
+            }
+        }
+
+        function updateIcon(icon) {
+            try {
+                const isDark = document.documentElement.classList.contains('wa-dark');
+                icon.setAttribute('name', isDark ? 'sun-bright' : 'moon');
+            } catch (e) {
+                // Ignore icon update errors
+            }
+        }
+
+        // Follow OS preference if no saved override
+        try {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                try {
+                    if (!localStorage.getItem('ug-theme')) {
+                        document.documentElement.classList.toggle('wa-dark', e.matches);
+                        const icon = document.querySelector('#btn-theme-dashboard wa-icon');
+                        if (icon) updateIcon(icon);
+                        document.dispatchEvent(new CustomEvent('theme-change'));
+                    }
+                } catch (err) {
+                    console.error('OS theme change failed:', err);
+                }
+            });
+        } catch (e) {
+            console.error('OS theme listener setup failed:', e);
+        }
+
+        // Observe DOM for dashboard render, then inject toggle
+        const observer = new MutationObserver(() => {
+            try {
+                if (initThemeToggle()) {
+                    observer.disconnect();
+                }
+            } catch (e) {
+                // Ignore observer errors
+            }
+        });
+        observer.observe(document.getElementById('app'), { childList: true, subtree: true });
+
+        // Also try immediately in case dashboard is already rendered
+        initThemeToggle();
+    </script>
+
     <script type="module" src="/js/app.js?v=4"></script>
 </body>
 </html>

@@ -5,56 +5,46 @@
     box-sizing: border-box;
 }
 
-/* === UG Brand Design Tokens === */
+/* === Whiteboard-specific tokens (brand vars come from theme.css) === */
 :root {
-    --brand-primary-base: #314F59;
-    --brand-primary-hover: #428B98;
-    --brand-primary-active: #2D444C;
-    --brand-highlight: #7FBEC6;
-    --brand-accent: #E07A5F;
-    --brand-bg: #f8f9fa;
-    --brand-surface: #ffffff;
-    --brand-surface-hover: #f1f5f9;
-    --brand-border: #e2e8f0;
-    --brand-text: #1d2327;
-    --brand-text-muted: #64748b;
+    /* Toolbar — brand-farver */
+    --toolbar-bg: var(--brand-surface, #ffffff);
+    --toolbar-hover: var(--brand-surface-hover, #f1f5f9);
+    --toolbar-active: var(--brand-primary-base, #314F59);
+    --toolbar-text: var(--brand-text, #1d2327);
+    --toolbar-border: var(--brand-border, #e2e8f0);
 
-    --toolbar-bg: #2c2c2c;
-    --toolbar-hover: #3c3c3c;
-    --toolbar-active: #4a4a4a;
-    --toolbar-text: #e0e0e0;
-    --canvas-bg: #f5f5f5;
-    --selection-blue: #2196F3;
+    /* Canvas */
+    --canvas-bg: var(--brand-bg, #f8f9fa);
+
+    /* Selection — brand teal */
+    --selection-color: var(--brand-primary-base, #314F59);
+    --selection-bg: color-mix(in srgb, var(--brand-primary-base, #314F59) 8%, transparent);
+
+    /* Sticky notes — bruger-valgte farver */
     --sticky-yellow: #FFF176;
     --sticky-pink: #F48FB1;
     --sticky-blue: #81D4FA;
     --sticky-green: #A5D6A7;
     --sticky-purple: #CE93D8;
     --sticky-orange: #FFCC80;
+
+    /* Shadows */
     --shadow: 0 2px 8px rgba(0,0,0,0.15);
     --shadow-lg: 0 4px 16px rgba(0,0,0,0.2);
 }
 
 html.wa-dark {
-    --brand-bg: #182028;
-    --brand-surface: #1e2c36;
-    --brand-surface-hover: #1a2830;
-    --brand-border: #354A56;
-    --brand-text: #d0dce4;
-    --brand-text-muted: #A0ABB3;
-    --brand-primary-base: #7FBEC6;
-    --brand-primary-hover: #7FBEC6;
-    --brand-highlight: #7FBEC6;
     --shadow: 0 2px 8px rgba(0,0,0,0.3);
     --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
 }
 
-/* === Duotone icon — coral primary, teal secondary (UG brand) === */
+/* === Duotone icon — teal primary, coral secondary (UG brand) === */
 wa-icon[family="sharp-duotone"][variant="thin"] {
     --primary-opacity: 1;
-    --primary-color: var(--brand-primary-base);
+    --primary-color: var(--brand-primary-base, #314F59);
     --secondary-opacity: 1;
-    --secondary-color: var(--brand-accent);
+    --secondary-color: var(--brand-accent, #E07A5F);
 }
 
 html, body {
@@ -191,10 +181,10 @@ html, body {
     padding-bottom: 8px;
 }
 
-/* Style wa-slider in the dark panel */
+/* Style wa-slider */
 #stroke-picker wa-slider {
-    --wa-color-primary-600: var(--selection-blue);
-    --track-color-active: var(--selection-blue);
+    --wa-color-primary-600: var(--selection-color);
+    --track-color-active: var(--selection-color);
 }
 
 /* === Top Bar === */
@@ -286,7 +276,7 @@ html, body {
 }
 
 #text-input-overlay textarea {
-    border: 2px solid var(--selection-blue);
+    border: 2px solid var(--selection-color);
     border-radius: 4px;
     padding: 4px 8px;
     font-family: inherit;
@@ -318,8 +308,8 @@ html, body {
 /* === Selection Box === */
 .selection-box {
     position: fixed;
-    border: 1px dashed var(--selection-blue);
-    background: rgba(33, 150, 243, 0.08);
+    border: 1px dashed var(--selection-color);
+    background: var(--selection-bg);
     pointer-events: none;
     z-index: 50;
 }
@@ -373,12 +363,12 @@ html, body {
     align-items: center;
     justify-content: space-between;
     padding: 6px 0;
-    border-bottom: 1px solid var(--wa-color-neutral-200, #eee);
+    border-bottom: 1px solid var(--brand-border);
     font-size: 13px;
 }
 
 #share-dialog .share-link-item code {
-    background: var(--wa-color-neutral-100, #f5f5f5);
+    background: var(--brand-surface-hover);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 12px;
@@ -398,7 +388,7 @@ html, body {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: var(--toolbar-bg);
+    background: var(--brand-primary-base);
     color: white;
     padding: 12px 20px;
     border-radius: 8px;
@@ -424,14 +414,15 @@ html, body {
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--toolbar-bg);
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 12px;
     padding: 10px 14px;
     display: none;
     gap: 12px;
     z-index: 100;
     box-shadow: var(--shadow-lg);
-    color: var(--toolbar-text);
+    color: var(--brand-text);
 }
 
 #connector-config.visible {
@@ -466,19 +457,19 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--toolbar-text);
+    color: var(--brand-text);
     transition: background 0.15s, border-color 0.15s;
     padding: 2px;
 }
 
 .marker-btn:hover, .line-style-btn:hover {
-    background: var(--toolbar-hover);
+    background: var(--brand-surface-hover);
 }
 
 .marker-btn.active, .line-style-btn.active {
-    background: var(--selection-blue);
+    background: var(--selection-color);
     color: white;
-    border-color: var(--selection-blue);
+    border-color: var(--selection-color);
 }
 
 .marker-btn svg, .line-style-btn svg {
@@ -539,7 +530,7 @@ html, body {
 
 .dashboard-header h1 {
     font-size: 28px;
-    color: #333;
+    color: var(--brand-text);
 }
 
 .dashboard-actions {
@@ -549,7 +540,7 @@ html, body {
 }
 
 .btn-primary {
-    background: var(--selection-blue);
+    background: var(--brand-primary-base);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -561,12 +552,12 @@ html, body {
 }
 
 .btn-primary:hover {
-    background: #1976D2;
+    background: var(--brand-primary-hover);
 }
 
 .btn-secondary {
-    background: #e0e0e0;
-    color: #333;
+    background: var(--brand-border);
+    color: var(--brand-text);
     border: none;
     padding: 10px 20px;
     border-radius: 8px;
@@ -576,7 +567,8 @@ html, body {
 }
 
 .btn-secondary:hover {
-    background: #ccc;
+    background: var(--brand-text-muted);
+    color: var(--brand-surface);
 }
 
 .boards-grid {
@@ -586,7 +578,7 @@ html, body {
 }
 
 .board-card {
-    background: white;
+    background: var(--brand-surface);
     border-radius: 12px;
     box-shadow: var(--shadow);
     overflow: hidden;
@@ -605,7 +597,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #999;
+    color: var(--brand-text-muted);
     font-size: 48px;
 }
 
@@ -616,13 +608,13 @@ html, body {
 .board-card-name {
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: var(--brand-text);
     margin-bottom: 4px;
 }
 
 .board-card-date {
     font-size: 12px;
-    color: #999;
+    color: var(--brand-text-muted);
 }
 
 .board-card-actions {
@@ -633,17 +625,17 @@ html, body {
 
 .board-card-actions button {
     background: none;
-    border: 1px solid #ddd;
+    border: 1px solid var(--brand-border);
     padding: 4px 12px;
     border-radius: 4px;
     font-size: 12px;
     cursor: pointer;
-    color: #666;
+    color: var(--brand-text-muted);
     transition: background 0.15s;
 }
 
 .board-card-actions button:hover {
-    background: #f0f0f0;
+    background: var(--brand-surface-hover);
 }
 
 .board-card-actions button.delete:hover {
@@ -662,7 +654,7 @@ html, body {
 }
 
 .auth-box {
-    background: white;
+    background: var(--brand-surface);
     padding: 40px;
     border-radius: 16px;
     box-shadow: var(--shadow-lg);
@@ -672,12 +664,12 @@ html, body {
 
 .auth-box h1 {
     font-size: 24px;
-    color: #333;
+    color: var(--brand-text);
     margin-bottom: 8px;
 }
 
 .auth-box p {
-    color: #666;
+    color: var(--brand-text-muted);
     margin-bottom: 24px;
     font-size: 14px;
 }
@@ -690,22 +682,24 @@ html, body {
     display: block;
     font-size: 13px;
     font-weight: 600;
-    color: #555;
+    color: var(--brand-text);
     margin-bottom: 4px;
 }
 
 .form-group input {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--brand-border);
     border-radius: 8px;
     font-size: 14px;
     outline: none;
     transition: border-color 0.15s;
+    background: var(--brand-surface);
+    color: var(--brand-text);
 }
 
 .form-group input:focus {
-    border-color: var(--selection-blue);
+    border-color: var(--brand-primary-base);
 }
 
 .auth-error {
@@ -723,10 +717,10 @@ html, body {
     gap: 10px;
     width: 100%;
     padding: 10px 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--brand-border);
     border-radius: 8px;
-    background: white;
-    color: #333;
+    background: var(--brand-surface);
+    color: var(--brand-text);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -734,7 +728,7 @@ html, body {
 }
 
 .btn-google:hover {
-    background: #f8f8f8;
+    background: var(--brand-surface-hover);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
@@ -747,7 +741,7 @@ html, body {
     align-items: center;
     margin: 16px 0;
     gap: 12px;
-    color: #999;
+    color: var(--brand-text-muted);
     font-size: 13px;
 }
 
@@ -756,18 +750,18 @@ html, body {
     content: '';
     flex: 1;
     height: 1px;
-    background: #ddd;
+    background: var(--brand-border);
 }
 
 .auth-link {
     text-align: center;
     margin-top: 16px;
     font-size: 13px;
-    color: #666;
+    color: var(--brand-text-muted);
 }
 
 .auth-link a {
-    color: var(--selection-blue);
+    color: var(--brand-primary-base);
     text-decoration: none;
 }
 
@@ -787,7 +781,7 @@ html, body {
 }
 
 .modal {
-    background: white;
+    background: var(--brand-surface);
     border-radius: 12px;
     padding: 24px;
     width: 100%;

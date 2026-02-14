@@ -15,7 +15,7 @@ export const MOCK_HALLER = [
         messeId: 'messe-001',
         bredde: 600,
         hoejde: 400,
-        farve: '#2196F3',
+        farve: '#314F59',
     },
     {
         id: 'hal-b',

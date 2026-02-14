@@ -410,11 +410,11 @@ function registerBuiltinTypes(app) {
             const sh = el.height * cam.zoom;
             if (!img.complete || !img.naturalWidth) {
                 // Draw placeholder while loading
-                ctx.strokeStyle = '#ccc';
+                ctx.strokeStyle = app.theme.brandBorder;
                 ctx.strokeRect(s.x, s.y, sw, sh);
-                ctx.fillStyle = '#f0f0f0';
+                ctx.fillStyle = app.theme.brandSurfaceHover;
                 ctx.fillRect(s.x, s.y, sw, sh);
-                ctx.fillStyle = '#999';
+                ctx.fillStyle = app.theme.brandTextMuted;
                 ctx.font = '14px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -492,6 +492,15 @@ export class WhiteboardApp {
         this.autoSaveInterval = null;
         this.lastSavedState = null;
 
+        // Load theme colors from CSS custom properties
+        this.theme = this.loadThemeColors();
+
+        // Listen for theme changes (dark mode toggle, OS preference)
+        const reloadTheme = () => { this.theme = this.loadThemeColors(); this.render(); };
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', reloadTheme);
+        document.addEventListener('theme-change', reloadTheme);
+        new MutationObserver(reloadTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+
         // Setup
         this.resize();
         this.setupEventListeners();
@@ -521,6 +530,35 @@ export class WhiteboardApp {
 
         // Start render loop
         this.render();
+    }
+
+    loadThemeColors() {
+        try {
+            const s = getComputedStyle(document.documentElement);
+            const get = (prop) => s.getPropertyValue(prop).trim();
+            return {
+                canvasBg:       get('--canvas-bg') || '#f8f9fa',
+                selectionColor: get('--selection-color') || '#314F59',
+                selectionBg:    get('--selection-bg') || 'rgba(49, 79, 89, 0.08)',
+                brandText:      get('--brand-text') || '#1d2327',
+                brandTextMuted: get('--brand-text-muted') || '#64748b',
+                brandBorder:    get('--brand-border') || '#e2e8f0',
+                brandSurface:   get('--brand-surface') || '#ffffff',
+                brandSurfaceHover: get('--brand-surface-hover') || '#f1f5f9',
+                brandPrimary:   get('--brand-primary-base') || '#314F59',
+                brandPrimaryHover: get('--brand-primary-hover') || '#428B98',
+                brandAccent:    get('--brand-accent') || '#E07A5F',
+                brandBg:        get('--brand-bg') || '#f8f9fa',
+            };
+        } catch (e) {
+            errorHandler.handleError(e, { context: 'loadThemeColors' });
+            return {
+                canvasBg: '#f8f9fa', selectionColor: '#314F59', selectionBg: 'rgba(49,79,89,0.08)',
+                brandText: '#1d2327', brandTextMuted: '#64748b', brandBorder: '#e2e8f0',
+                brandSurface: '#ffffff', brandSurfaceHover: '#f1f5f9', brandPrimary: '#314F59',
+                brandPrimaryHover: '#428B98', brandAccent: '#E07A5F', brandBg: '#f8f9fa',
+            };
+        }
     }
 
     startAutoSave() {
@@ -718,7 +756,7 @@ export class WhiteboardApp {
             const h = this.canvas.height / (window.devicePixelRatio || 1);
 
             ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = '#f5f5f5';
+            ctx.fillStyle = this.theme.canvasBg;
             ctx.fillRect(0, 0, w, h);
 
             this.drawGrid(ctx, w, h);
@@ -763,7 +801,7 @@ export class WhiteboardApp {
         const startX = Math.floor(topLeft.x / gridSize) * gridSize;
         const startY = Math.floor(topLeft.y / gridSize) * gridSize;
 
-        ctx.fillStyle = '#ddd';
+        ctx.fillStyle = this.theme.brandBorder;
         for (let wx = startX; wx <= bottomRight.x; wx += gridSize) {
             for (let wy = startY; wy <= bottomRight.y; wy += gridSize) {
                 const s = cam.worldToScreen(wx, wy);
@@ -841,7 +879,7 @@ export class WhiteboardApp {
         ctx.fill();
 
         if (el.content) {
-            ctx.fillStyle = '#333';
+            ctx.fillStyle = this.theme.brandText;
             ctx.font = `${(el.fontSize || 14) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.textBaseline = 'top';
             const padding = 12 * cam.zoom;
@@ -867,7 +905,7 @@ export class WhiteboardApp {
             ctx.roundRect(s.x, s.y, sw, sh, 2 * cam.zoom);
             ctx.fill();
         }
-        ctx.strokeStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.beginPath();
         ctx.roundRect(s.x, s.y, sw, sh, 2 * cam.zoom);
@@ -889,7 +927,7 @@ export class WhiteboardApp {
             ctx.fillStyle = el.fill;
             ctx.fill();
         }
-        ctx.strokeStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.stroke();
     }
@@ -937,7 +975,7 @@ export class WhiteboardApp {
             ctx.fillStyle = el.fill;
             ctx.fill();
         }
-        ctx.strokeStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.stroke();
     }
@@ -947,7 +985,7 @@ export class WhiteboardApp {
         const cam = this.camera;
         const s1 = cam.worldToScreen(el.x, el.y);
         const s2 = cam.worldToScreen(el.x2, el.y2);
-        ctx.strokeStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -962,8 +1000,8 @@ export class WhiteboardApp {
         const s1 = cam.worldToScreen(el.x, el.y);
         const s2 = cam.worldToScreen(el.x2, el.y2);
 
-        ctx.strokeStyle = el.color || '#333';
-        ctx.fillStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
+        ctx.fillStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
 
@@ -991,8 +1029,8 @@ export class WhiteboardApp {
         const s1 = cam.worldToScreen(pts.sx, pts.sy);
         const s2 = cam.worldToScreen(pts.ex, pts.ey);
 
-        ctx.strokeStyle = el.color || '#333';
-        ctx.fillStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
+        ctx.fillStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
 
@@ -1011,11 +1049,11 @@ export class WhiteboardApp {
         const headSize = 12 * cam.zoom;
         if (el.sourceMarker && el.sourceMarker !== 'none') {
             const angle = Math.atan2(s1.y - s2.y, s1.x - s2.x);
-            this.drawEndpointMarker(ctx, s1.x, s1.y, angle, el.sourceMarker, headSize, el.color || '#333', el.strokeWidth * cam.zoom);
+            this.drawEndpointMarker(ctx, s1.x, s1.y, angle, el.sourceMarker, headSize, el.color || this.theme.brandText, el.strokeWidth * cam.zoom);
         }
         if (el.targetMarker && el.targetMarker !== 'none') {
             const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
-            this.drawEndpointMarker(ctx, s2.x, s2.y, angle, el.targetMarker, headSize, el.color || '#333', el.strokeWidth * cam.zoom);
+            this.drawEndpointMarker(ctx, s2.x, s2.y, angle, el.targetMarker, headSize, el.color || this.theme.brandText, el.strokeWidth * cam.zoom);
         }
 
         // Label
@@ -1027,12 +1065,14 @@ export class WhiteboardApp {
             const textW = ctx.measureText(el.label).width;
             const pad = 4 * cam.zoom;
 
-            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillStyle = this.theme.brandSurface;
+            ctx.globalAlpha = 0.9;
             ctx.beginPath();
             ctx.roundRect(mx - textW / 2 - pad, my - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2, 3 * cam.zoom);
             ctx.fill();
+            ctx.globalAlpha = 1;
 
-            ctx.fillStyle = el.color || '#333';
+            ctx.fillStyle = el.color || this.theme.brandText;
             ctx.textBaseline = 'middle';
             ctx.textAlign = 'center';
             ctx.fillText(el.label, mx, my);
@@ -1137,7 +1177,7 @@ export class WhiteboardApp {
     drawDrawing(ctx, el) {
         if (!el.points || el.points.length < 2) return;
         const cam = this.camera;
-        ctx.strokeStyle = el.color || '#333';
+        ctx.strokeStyle = el.color || this.theme.brandText;
         ctx.lineWidth = (el.strokeWidth || 2) * cam.zoom;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -1156,7 +1196,7 @@ export class WhiteboardApp {
     drawText(ctx, el) {
         const cam = this.camera;
         const s = cam.worldToScreen(el.x, el.y);
-        ctx.fillStyle = el.color || '#333';
+        ctx.fillStyle = el.color || this.theme.brandText;
         ctx.font = `${(el.fontSize || 16) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
         ctx.textBaseline = 'top';
 
@@ -1180,13 +1220,13 @@ export class WhiteboardApp {
         const sh = el.height * cam.zoom;
 
         // Background
-        ctx.fillStyle = el.fill || '#FFFFFF';
+        ctx.fillStyle = el.fill || this.theme.brandSurface;
         ctx.beginPath();
         ctx.roundRect(s.x, s.y, sw, sh, 4 * cam.zoom);
         ctx.fill();
 
         // Border
-        ctx.strokeStyle = el.borderColor || '#cccccc';
+        ctx.strokeStyle = el.borderColor || this.theme.brandBorder;
         ctx.lineWidth = (el.strokeWidth || 1) * cam.zoom;
         ctx.beginPath();
         ctx.roundRect(s.x, s.y, sw, sh, 4 * cam.zoom);
@@ -1194,7 +1234,7 @@ export class WhiteboardApp {
 
         // Text content
         if (el.content) {
-            ctx.fillStyle = el.color || '#333';
+            ctx.fillStyle = el.color || this.theme.brandText;
             ctx.font = `${(el.fontSize || 14) * cam.zoom}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.textBaseline = 'top';
             const padding = 10 * cam.zoom;
@@ -1221,7 +1261,7 @@ export class WhiteboardApp {
             }
             const s1 = cam.worldToScreen(minX - pad, minY - pad);
             const s2 = cam.worldToScreen(maxX + pad, maxY + pad);
-            ctx.strokeStyle = '#2196F3';
+            ctx.strokeStyle = this.theme.selectionColor;
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.strokeRect(s1.x, s1.y, s2.x - s1.x, s2.y - s1.y);
@@ -1234,7 +1274,7 @@ export class WhiteboardApp {
             const s2 = cam.worldToScreen(el.x2, el.y2);
             // Dashed line for connector selection
             if (el.type === 'connector') {
-                ctx.strokeStyle = '#2196F3';
+                ctx.strokeStyle = this.theme.selectionColor;
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -1243,7 +1283,7 @@ export class WhiteboardApp {
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
-            ctx.fillStyle = '#2196F3';
+            ctx.fillStyle = this.theme.selectionColor;
             for (const s of [s1, s2]) {
                 ctx.beginPath();
                 ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
@@ -1256,7 +1296,7 @@ export class WhiteboardApp {
         const sw = (el.width + pad * 2) * cam.zoom;
         const sh = (el.height + pad * 2) * cam.zoom;
 
-        ctx.strokeStyle = '#2196F3';
+        ctx.strokeStyle = this.theme.selectionColor;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.strokeRect(s.x, s.y, sw, sh);
@@ -1264,7 +1304,7 @@ export class WhiteboardApp {
 
         const handles = getResizeHandles(el);
         ctx.fillStyle = 'white';
-        ctx.strokeStyle = '#2196F3';
+        ctx.strokeStyle = this.theme.selectionColor;
         ctx.lineWidth = 2;
         const handleSize = 4;
         for (const [, hx, hy] of handles) {

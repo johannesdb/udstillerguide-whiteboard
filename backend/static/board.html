@@ -146,8 +146,8 @@
 
     <!-- Stroke color picker - Web Awesome -->
     <div id="color-picker">
-        <wa-color-picker id="stroke-color-wa" value="#333333" size="small" label="Stroke color"
-            swatches="#333333; #F44336; #2196F3; #4CAF50; #FF9800; #9C27B0; #FFFFFF"
+        <wa-color-picker id="stroke-color-wa" value="#1d2327" size="small" label="Stroke color"
+            swatches="#1d2327; #314F59; #E07A5F; #4CAF50; #FF9800; #9C27B0; #FFFFFF"
             hoist></wa-color-picker>
     </div>
 
@@ -335,16 +335,26 @@
         updateThemeIcon();
 
         themeBtn?.addEventListener('click', () => {
-            const isDark = document.documentElement.classList.toggle('wa-dark');
-            localStorage.setItem('ug-theme', isDark ? 'dark' : 'light');
-            updateThemeIcon();
+            try {
+                const isDark = document.documentElement.classList.toggle('wa-dark');
+                localStorage.setItem('ug-theme', isDark ? 'dark' : 'light');
+                updateThemeIcon();
+                document.dispatchEvent(new CustomEvent('theme-change'));
+            } catch (e) {
+                console.error('Theme toggle failed:', e);
+            }
         });
 
         // Follow OS preference if no saved override
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('ug-theme')) {
-                document.documentElement.classList.toggle('wa-dark', e.matches);
-                updateThemeIcon();
+            try {
+                if (!localStorage.getItem('ug-theme')) {
+                    document.documentElement.classList.toggle('wa-dark', e.matches);
+                    updateThemeIcon();
+                    document.dispatchEvent(new CustomEvent('theme-change'));
+                }
+            } catch (err) {
+                console.error('OS theme change failed:', err);
             }
         });
     </script>

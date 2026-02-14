@@ -992,7 +992,7 @@ export class ToolManager {
                 const from = cam.worldToScreen(cx, cy);
                 const to = cam.worldToScreen(this.lastMouseWorld.x, this.lastMouseWorld.y);
                 ctx.save();
-                ctx.strokeStyle = 'rgba(33, 150, 243, 0.5)';
+                ctx.strokeStyle = this.app.theme.selectionColor + '80';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([6, 4]);
                 ctx.beginPath();
@@ -1016,9 +1016,9 @@ export class ToolManager {
 
                     ctx.beginPath();
                     ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = isHovered ? '#2196F3' : 'rgba(33, 150, 243, 0.3)';
+                    ctx.fillStyle = isHovered ? this.app.theme.selectionColor : (this.app.theme.selectionColor + '4D');
                     ctx.fill();
-                    ctx.strokeStyle = '#2196F3';
+                    ctx.strokeStyle = this.app.theme.selectionColor;
                     ctx.lineWidth = isHovered ? 2 : 1;
                     ctx.stroke();
                 }
@@ -1055,10 +1055,10 @@ export class ToolManager {
             const cam = this.app.camera;
             const s1 = cam.worldToScreen(this.selectionRect.x1, this.selectionRect.y1);
             const s2 = cam.worldToScreen(this.selectionRect.x2, this.selectionRect.y2);
-            ctx.strokeStyle = '#2196F3';
+            ctx.strokeStyle = this.app.theme.selectionColor;
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
-            ctx.fillStyle = 'rgba(33, 150, 243, 0.08)';
+            ctx.fillStyle = this.app.theme.selectionBg;
             const rx = Math.min(s1.x, s2.x), ry = Math.min(s1.y, s2.y);
             const rw = Math.abs(s2.x - s1.x), rh = Math.abs(s2.y - s1.y);
             ctx.fillRect(rx, ry, rw, rh);

@@ -150,13 +150,13 @@ class App {
             <div class="dashboard-header">
                 <h1>My Boards</h1>
                 <div class="dashboard-actions">
-                    <span style="color:#666; font-size:13px">Hello, ${user?.username || 'User'}</span>
+                    <span style="color:var(--brand-text-muted); font-size:13px">Hello, ${user?.username || 'User'}</span>
                     <button class="btn-primary" id="btn-new-board">+ New Board</button>
                     <button class="btn-secondary" id="btn-logout">Logout</button>
                 </div>
             </div>
             <div class="boards-grid" id="boards-grid">
-                <div style="color:#999; padding:40px; text-align:center; grid-column: 1/-1;">Loading boards...</div>
+                <div style="color:var(--brand-text-muted); padding:40px; text-align:center; grid-column: 1/-1;">Loading boards...</div>
             </div>
         `;
         this.appEl.appendChild(dashboard);
@@ -175,7 +175,7 @@ class App {
 
             if (boards.length === 0) {
                 grid.innerHTML = `
-                    <div style="color:#999; padding:60px; text-align:center; grid-column: 1/-1;">
+                    <div style="color:var(--brand-text-muted); padding:60px; text-align:center; grid-column: 1/-1;">
                         <p style="font-size:48px; margin-bottom:16px">+</p>
                         <p>No boards yet. Create your first one!</p>
                     </div>
@@ -192,7 +192,7 @@ class App {
                 const isOwner = user && board.owner_id === user.id;
                 card.innerHTML = `
                     <div class="board-card-preview">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--brand-border)" stroke-width="1">
                             <rect x="3" y="3" width="18" height="18" rx="2"/>
                             <path d="M8 8h8M8 12h5"/>
                         </svg>

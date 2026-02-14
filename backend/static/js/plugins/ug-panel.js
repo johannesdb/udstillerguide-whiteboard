@@ -252,7 +252,7 @@ function renderStandList(container, app, stande, udstillere) {
             item.style.cssText = `
                 display:flex; align-items:center; gap:8px;
                 padding:6px 8px; border-radius:4px; margin-bottom:4px;
-                background:white; border:1px solid var(--wa-color-neutral-200);
+                background:var(--brand-surface, #ffffff); border:1px solid var(--wa-color-neutral-200);
                 font-size:12px; cursor:pointer;
             `;
             item.innerHTML = `

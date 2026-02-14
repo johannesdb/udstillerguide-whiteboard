@@ -5,6 +5,16 @@ import { generateId, createConnector } from '/js/canvas.js?v=4';
 import { STATUS_FARVER, findUdstiller, getStandeForHal } from './ug-api.js?v=4';
 import { UG_ELEMENT_TYPES } from './ug-elements.js?v=4';
 
+// Read a CSS custom property from :root, with fallback
+function getBrandColor(varName, fallback) {
+    try {
+        const val = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        return val || fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
 // === Gulvplan (View 1) ===
 
 export function generateGulvplan(app, data, originX = 100, originY = 100) {
@@ -104,7 +114,7 @@ export function generateHierarki(app, data, originX = 100, originY = 600) {
         halEls.push(el);
 
         // Connector messe -> hal
-        connectors.push(createConnector(messeEl.id, el.id, 'auto', 'auto', '#666', 1.5));
+        connectors.push(createConnector(messeEl.id, el.id, 'auto', 'auto', getBrandColor('--brand-text-muted', '#64748b'), 1.5));
     });
 
     // Level 2: Taxonomier (ved siden af haller)
@@ -113,11 +123,11 @@ export function generateHierarki(app, data, originX = 100, originY = 600) {
 
     taxRoots.forEach((taxRoot, idx) => {
         const x = taxStartX + idx * (nodeW + siblingGap);
-        const rootEl = makeNode(x, halY, nodeW, nodeH, taxRoot.navn, 'taxonomi', '#9C27B0');
+        const rootEl = makeNode(x, halY, nodeW, nodeH, taxRoot.navn, 'taxonomi', getBrandColor('--brand-accent', '#E07A5F'));
         elements.push(rootEl);
 
         // Connector messe -> taxonomi
-        connectors.push(createConnector(messeEl.id, rootEl.id, 'auto', 'auto', '#999', 1));
+        connectors.push(createConnector(messeEl.id, rootEl.id, 'auto', 'auto', getBrandColor('--brand-text-muted', '#64748b'), 1));
 
         // Level 3: Underkategorier
         const children = data.taxonomier.filter(t => t.parent === taxRoot.id);
@@ -126,9 +136,10 @@ export function generateHierarki(app, data, originX = 100, originY = 600) {
 
         children.forEach((child, ci) => {
             const cx = childStartX + ci * (nodeW * 0.7 + 10);
-            const childEl = makeNode(cx, childY, nodeW * 0.7, nodeH - 5, child.navn, 'taxonomi', '#CE93D8');
+            const highlightColor = getBrandColor('--brand-highlight', '#7FBEC6');
+            const childEl = makeNode(cx, childY, nodeW * 0.7, nodeH - 5, child.navn, 'taxonomi', highlightColor);
             elements.push(childEl);
-            connectors.push(createConnector(rootEl.id, childEl.id, 'auto', 'auto', '#CE93D8', 1));
+            connectors.push(createConnector(rootEl.id, childEl.id, 'auto', 'auto', highlightColor, 1));
         });
     });
 
@@ -137,7 +148,8 @@ export function generateHierarki(app, data, originX = 100, originY = 600) {
 
 // === Hjælper: opret en node-element til hierarki ===
 
-function makeNode(x, y, w, h, label, nodeType, color = '#333') {
+function makeNode(x, y, w, h, label, nodeType, color = null) {
+    color = color || getBrandColor('--brand-text', '#1d2327');
     return {
         id: generateId(),
         type: 'rect',
