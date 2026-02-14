@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whiteboard</title>
+    <link rel="stylesheet" href="https://app.udstillerguide.dk/static/css/theme.css">
     <link rel="stylesheet" href="/vendor/webawesome/styles/webawesome.css?v=4">
     <link rel="stylesheet" href="/css/style.css?v=4">
     <script type="importmap">
@@ -34,6 +35,10 @@
         <wa-tooltip for="btn-redo" placement="bottom">Redo (Ctrl+Shift+Z)</wa-tooltip>
         <button class="top-btn" id="btn-share">Share</button>
         <wa-tooltip for="btn-share" placement="bottom">Share board</wa-tooltip>
+        <button class="top-btn" id="btn-theme">
+            <wa-icon name="moon" family="sharp-duotone" variant="thin"></wa-icon>
+        </button>
+        <wa-tooltip for="btn-theme" placement="bottom">Toggle dark mode</wa-tooltip>
     </div>
 
     <!-- Presence bar -->
@@ -290,6 +295,16 @@
         <canvas id="canvas"></canvas>
     </div>
 
+    <script>
+        // Theme detection — runs before module scripts to avoid FOUC
+        (function() {
+            const saved = localStorage.getItem('ug-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (!saved && prefersDark)) {
+                document.documentElement.classList.add('wa-dark');
+            }
+        })();
+    </script>
     <script type="module">
         // Import UG plugin BEFORE WhiteboardApp so element types are registered
         // Use dynamic import so a missing plugin doesn't block the entire app
@@ -309,6 +324,29 @@
             shareToken,
         });
         window.__whiteboardApp = app;
+
+        // Theme toggle
+        const themeBtn = document.getElementById('btn-theme');
+        const themeIcon = themeBtn?.querySelector('wa-icon');
+        function updateThemeIcon() {
+            const isDark = document.documentElement.classList.contains('wa-dark');
+            if (themeIcon) themeIcon.name = isDark ? 'sun' : 'moon';
+        }
+        updateThemeIcon();
+
+        themeBtn?.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('wa-dark');
+            localStorage.setItem('ug-theme', isDark ? 'dark' : 'light');
+            updateThemeIcon();
+        });
+
+        // Follow OS preference if no saved override
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('ug-theme')) {
+                document.documentElement.classList.toggle('wa-dark', e.matches);
+                updateThemeIcon();
+            }
+        });
     </script>
 </body>
 </html>

@@ -5,15 +5,20 @@
     box-sizing: border-box;
 }
 
-/* === Duotone icon — coral primary, teal secondary (UG brand) === */
-wa-icon[family="sharp-duotone"][variant="thin"] {
-    --primary-opacity: 1;
-    --primary-color: #314F59;
-    --secondary-opacity: 1;
-    --secondary-color: #E07A5F;
-}
-
+/* === UG Brand Design Tokens === */
 :root {
+    --brand-primary-base: #314F59;
+    --brand-primary-hover: #428B98;
+    --brand-primary-active: #2D444C;
+    --brand-highlight: #7FBEC6;
+    --brand-accent: #E07A5F;
+    --brand-bg: #f8f9fa;
+    --brand-surface: #ffffff;
+    --brand-surface-hover: #f1f5f9;
+    --brand-border: #e2e8f0;
+    --brand-text: #1d2327;
+    --brand-text-muted: #64748b;
+
     --toolbar-bg: #2c2c2c;
     --toolbar-hover: #3c3c3c;
     --toolbar-active: #4a4a4a;
@@ -28,6 +33,28 @@ wa-icon[family="sharp-duotone"][variant="thin"] {
     --sticky-orange: #FFCC80;
     --shadow: 0 2px 8px rgba(0,0,0,0.15);
     --shadow-lg: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+html.wa-dark {
+    --brand-bg: #182028;
+    --brand-surface: #1e2c36;
+    --brand-surface-hover: #1a2830;
+    --brand-border: #354A56;
+    --brand-text: #d0dce4;
+    --brand-text-muted: #A0ABB3;
+    --brand-primary-base: #7FBEC6;
+    --brand-primary-hover: #7FBEC6;
+    --brand-highlight: #7FBEC6;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* === Duotone icon — coral primary, teal secondary (UG brand) === */
+wa-icon[family="sharp-duotone"][variant="thin"] {
+    --primary-opacity: 1;
+    --primary-color: var(--brand-primary-base);
+    --secondary-opacity: 1;
+    --secondary-color: var(--brand-accent);
 }
 
 html, body {
@@ -58,8 +85,8 @@ html, body {
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 12px;
     padding: 8px;
     display: flex;
@@ -81,17 +108,17 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #314F59;
+    color: var(--brand-primary-base);
     transition: background 0.15s, color 0.15s;
     position: relative;
 }
 
 .tool-btn:hover {
-    background: #f1f5f9;
+    background: var(--brand-surface-hover);
 }
 
 .tool-btn.active {
-    background: #314F59;
+    background: var(--brand-primary-base);
     color: white;
 }
 
@@ -103,7 +130,7 @@ html, body {
 .tool-separator {
     width: 28px;
     height: 1px;
-    background: #e2e8f0;
+    background: var(--brand-border);
     margin: 4px auto;
 }
 
@@ -112,8 +139,8 @@ html, body {
 #fill-picker {
     position: fixed;
     left: 72px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 12px;
     padding: 12px;
     display: none;
@@ -128,23 +155,23 @@ html, body {
     display: flex;
 }
 
-/* Style the wa-color-picker inside the light toolbar panels */
+/* Style the wa-color-picker inside toolbar panels */
 #color-picker wa-color-picker,
 #fill-picker wa-color-picker {
-    color: #314F59;
+    color: var(--brand-primary-base);
 }
 
 #color-picker wa-color-picker::part(form-control-label),
 #fill-picker wa-color-picker::part(form-control-label) {
-    color: #314F59;
+    color: var(--brand-primary-base);
 }
 
 /* === Stroke Width Picker === */
 #stroke-picker {
     position: fixed;
     left: 72px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 12px;
     padding: 12px;
     display: none;
@@ -159,7 +186,7 @@ html, body {
 }
 
 #stroke-picker label {
-    color: #314F59;
+    color: var(--brand-primary-base);
     font-size: 15px;
     padding-bottom: 8px;
 }
@@ -176,8 +203,8 @@ html, body {
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 8px;
     padding: 6px 16px;
     display: flex;
@@ -185,7 +212,7 @@ html, body {
     gap: 12px;
     z-index: 100;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    color: #314F59;
+    color: var(--brand-primary-base);
     font-size: 13px;
 }
 
@@ -209,7 +236,7 @@ html, body {
 .top-btn {
     background: transparent;
     border: none;
-    color: #314F59;
+    color: var(--brand-primary-base);
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 4px;
@@ -218,7 +245,7 @@ html, body {
 }
 
 .top-btn:hover {
-    background: #f1f5f9;
+    background: var(--brand-surface-hover);
 }
 
 /* === Presence Bar (Web Awesome Avatars) === */
@@ -300,7 +327,8 @@ html, body {
 /* === Context Menu === */
 #context-menu {
     z-index: 9999;
-    background: white;
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-border);
     border-radius: 8px;
     box-shadow: var(--shadow-lg);
     min-width: 180px;
@@ -311,7 +339,7 @@ html, body {
     padding: 8px 16px;
     font-size: 13px;
     cursor: pointer;
-    color: #333;
+    color: var(--brand-text);
     transition: background 0.1s;
     display: flex;
     align-items: center;
@@ -322,16 +350,16 @@ html, body {
     font-size: 14px;
     width: 16px;
     text-align: center;
-    color: #666;
+    color: var(--brand-text-muted);
 }
 
 .ctx-item:hover {
-    background: #f0f0f0;
+    background: var(--brand-surface-hover);
 }
 
 .ctx-divider {
     height: 1px;
-    background: #eee;
+    background: var(--brand-border);
     margin: 4px 0;
 }
 
@@ -470,11 +498,11 @@ html, body {
 }
 
 #plugin-sidebar::part(panel) {
-    background: white;
+    background: var(--brand-surface);
 }
 
 #plugin-sidebar-header {
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--brand-border);
 }
 
 /* === Scrollbar === */
@@ -487,12 +515,12 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #ccc;
+    background: var(--brand-border);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
+    background: var(--brand-text-muted);
 }
 
 /* === Dashboard Styles === */
