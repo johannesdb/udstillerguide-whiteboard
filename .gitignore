@@ -5,3 +5,13 @@ node_modules/
 *.swo
 *~
 .DS_Store
+
+# Test artifacts
+.playwright-mcp/
+test-results/
+
+# Local vendor symlinks
+backend/static/vendor/
+
+# Temporary screenshots
+/*.png
